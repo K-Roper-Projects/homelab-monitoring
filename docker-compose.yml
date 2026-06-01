@@ -1,0 +1,35 @@
+networks:
+ monitoring:
+   driver: bridge
+
+volumes:
+ prometheus-data:
+ grafana-data:
+
+services:
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: grafana
+    ports:
+      - "3000:3000"
+
+  node-exporter:
+    image: prom/node-exporter
+    container_name: node-exporter
+    expose:
+      - "9100"
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter
+    container_name: blackbox-exporter
+    expose:
+      - "9115"
