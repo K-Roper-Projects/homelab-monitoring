@@ -1,7 +1,3 @@
-
-
-
-
 # HomeLab Monitoring Stack
 
 ## Overview
@@ -12,7 +8,9 @@ The monitoring stack is hosted on an Ubuntu virtual machine and deployed using D
 
 The goal was to build a monitoring solution from the ground up, document the deployment process, and gain practical experience with technologies commonly used in cloud, infrastructure and DevOps environments.
 
----
+<img src="Screenshots/monitoring-architecture-v2.png" width="900"
+<img src="Screenshots/infrastructure-dashboard.png" width="900"
+<img src="Screenshots/network-dashboard.png" width="900"
 
 ## Project Objectives
 
