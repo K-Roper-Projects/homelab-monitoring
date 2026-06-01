@@ -12,6 +12,29 @@ The goal was to build a monitoring solution from the ground up, document the dep
 <img src="Screenshots/infrastructure-dashboard.png" width="900">
 <img src="Screenshots/network-dashboard.png" width="900">
 
+## Quick Start
+
+Clone the repository:
+
+```bash
+git clone git@github.com:YOUR-USERNAME/homelab-monitoring.git
+cd homelab-monitoring
+```
+
+Start the monitoring stack:
+
+```bash
+docker compose up -d
+```
+
+Access the services:
+
+| Service | URL |
+|----------|----------|
+| Grafana | http://localhost:3000 |
+| Prometheus | http://localhost:9090 |
+
+
 ## Project Objectives
 
 * Deploy a monitoring stack using Docker Compose
