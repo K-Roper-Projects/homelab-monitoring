@@ -8,6 +8,8 @@ The monitoring stack is hosted on an Ubuntu virtual machine and deployed using D
 
 The goal was to build a monitoring solution from the ground up, document the deployment process, and gain practical experience with technologies commonly used in cloud, infrastructure and DevOps environments.
 
+Grafana Alerting and SMTP email notifications were also implemented to provide proactive monitoring and automated incident notification.
+
 <img src="Screenshots/monitoring-architecture-v2.png" width="500">
 <img src="Screenshots/infrastructure-dashboard.png" width="900">
 <img src="Screenshots/network-dashboard.png" width="900">
@@ -44,6 +46,8 @@ Access the services:
 * Monitor network availability and latency
 * Manage project configuration using Git and GitHub
 * Gain practical experience with Linux, Docker and observability tooling
+* Implement monitoring alerting and email notifications
+* Configure persistent Docker storage for monitoring services
 
 ---
 
@@ -66,6 +70,8 @@ Access the services:
 * Blackbox Exporter
 * Docker
 * Docker Compose
+* Grafana Alerting
+* SMTP Email Notifications
 
 ### Network Equipment
 
@@ -106,6 +112,25 @@ Metrics include:
 * Network throughput
 * System load
 * System uptime
+
+### Alerting
+
+Grafana Alerting was configured to provide automated email notifications when predefined monitoring thresholds are exceeded.
+
+Alert notifications are delivered via SMTP using a dedicated project email account.
+
+Configured alert rules include:
+
+### Network Alerts
+
+* Internet Connectivity Lost
+* Router Unreachable
+* High Internet Latency
+* High Router Latency
+
+Alerts are evaluated every minute and generate email notifications when alert conditions remain active beyond the configured pending period.
+
+This provides proactive monitoring rather than relying solely on dashboard visualisation.
 
 ### Network Health Dashboard
 
@@ -156,6 +181,10 @@ This project provided practical experience with:
 * GitHub repository management
 * SSH authentication and key management
 * Troubleshooting containerised applications
+* Grafana alerting configuration
+* Email notification integration
+* Docker persistent storage management
+* Infrastructure monitoring and alerting
 
 ---
 
@@ -170,6 +199,9 @@ During the build process several issues were encountered and resolved, including
 * Prometheus target configuration
 * Grafana datasource connectivity issues
 * GitHub SSH authentication setup
+* Grafana persistent storage configuration
+* Recovery from container recreation without persistent volumes
+* SMTP integration and email alert configuration
 
 Resolving these issues provided valuable experience with troubleshooting Linux and container-based environments.
 
@@ -185,6 +217,15 @@ Resolving these issues provided valuable experience with troubleshooting Linux a
 
 <img width="1920" height="955" alt="Network Dash" src="https://github.com/user-attachments/assets/28ca5893-4a17-41c0-abed-c07fe6a9469b" />
 
+### Lessons Learned
+
+This project highlighted the importance of persistent storage when deploying stateful applications within containers.
+
+During development, Grafana dashboards were lost following container recreation due to the absence of a persistent Docker volume. The issue was diagnosed and resolved by configuring a dedicated Docker volume mapped to /var/lib/grafana.
+
+Additional experience was gained configuring SMTP integration and automated alert notifications within Grafana.
+
+These challenges provided practical experience with troubleshooting, data persistence and operational monitoring concepts.
 
 ---
 
@@ -192,12 +233,12 @@ Resolving these issues provided valuable experience with troubleshooting Linux a
 
 Planned enhancements include:
 
-* Implementing Alertmanager for automated alerting
+* Deploying the monitoring platform within AWS EC2
+* Implementing Infrastructure as Code using Terraform
 * Adding cAdvisor for container-level monitoring
 * Monitoring additional Linux hosts
 * Monitoring web services and applications
 * Building custom Grafana dashboards
-* Exploring cloud deployment options within AWS
 
 ---
 
