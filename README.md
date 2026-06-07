@@ -1,18 +1,92 @@
-# HomeLab Monitoring Stack
+### HomeLab Monitoring Stack
 
 ## Overview
 
-This project was created to gain hands-on experience with infrastructure monitoring, Linux administration, containerisation and observability tooling.
+This project was created to gain hands-on experience with infrastructure monitoring, Linux administration, containerisation, cloud deployment and observability tooling.
 
-The monitoring stack is hosted on an Ubuntu virtual machine and deployed using Docker Compose. Prometheus is used to collect and store metrics, Grafana provides visualisation and dashboards, Node Exporter collects host-level metrics from the VM, and Blackbox Exporter is used to monitor network connectivity and latency.
+The project began as a locally hosted monitoring platform running on an Ubuntu virtual machine and was later extended into a cloud-hosted deployment on AWS EC2. The monitoring stack is deployed using Docker Compose and consists of Prometheus, Grafana, Node Exporter and Blackbox Exporter.
 
-The goal was to build a monitoring solution from the ground up, document the deployment process, and gain practical experience with technologies commonly used in cloud, infrastructure and DevOps environments.
+Prometheus is used to collect and store metrics, Grafana provides dashboards and visualisation, Node Exporter collects host-level infrastructure metrics, and Blackbox Exporter is used to monitor service availability and network connectivity.
+
+The primary goal of the project was to design, deploy, troubleshoot and document a complete monitoring solution while gaining practical experience with technologies commonly used within cloud, infrastructure, platform engineering and DevOps environments.
 
 Grafana Alerting and SMTP email notifications were also implemented to provide proactive monitoring and automated incident notification.
 
-<img src="Screenshots/monitoring-architecture-v2.png" width="500">
-<img src="Screenshots/infrastructure-dashboard.png" width="900">
-<img src="Screenshots/network-dashboard.png" width="900">
+## Project Evolution
+### Phase 1 - HomeLab Monitoring
+
+The project initially focused on building a monitoring platform within a HomeLab environment using an Ubuntu virtual machine hosted on Oracle VirtualBox.
+
+The monitoring stack was deployed using Docker Compose and configured to monitor:
+
+Ubuntu virtual machine health
+CPU utilisation
+Memory utilisation
+Disk utilisation
+System uptime
+Router availability
+Internet connectivity
+Network latency
+
+Additional functionality included:
+
+Grafana Alerting
+SMTP email notifications
+Persistent Docker volumes
+GitHub source control
+SSH authentication
+
+The HomeLab deployment provided practical experience with Linux administration, containerisation, observability tooling and infrastructure monitoring concepts.
+
+### Phase 2 - AWS Cloud Deployment
+
+Following successful completion of the HomeLab deployment, the monitoring platform was migrated to AWS EC2 to gain practical cloud deployment experience.
+
+The AWS deployment introduced:
+
+Amazon EC2
+AWS IAM
+Security Groups
+AWS Budgets
+Cloud-hosted monitoring services
+Service availability monitoring
+Infrastructure monitoring
+Docker service monitoring
+
+Three dedicated Grafana dashboards were developed for the AWS environment:
+
+EC2 Monitoring Dashboard
+
+Provides visibility into:
+
+CPU utilisation
+Memory utilisation
+Disk utilisation
+Network throughput
+System load
+System uptime
+AWS Website Monitoring Dashboard
+
+Monitors:
+
+AWS website availability
+AWS website response time
+Historical service availability
+External endpoint monitoring
+
+Target monitored:
+
+https://aws.amazon.com
+Docker Container Monitoring Dashboard
+
+Monitors:
+
+Grafana service availability
+Prometheus service availability
+Service response times
+Historical service uptime
+
+The AWS deployment demonstrates practical experience with cloud infrastructure, Linux server administration, Docker deployment, monitoring platform migration and cloud-based observability tooling.
 
 ## Quick Start
 
@@ -48,19 +122,38 @@ Access the services:
 * Gain practical experience with Linux, Docker and observability tooling
 * Implement monitoring alerting and email notifications
 * Configure persistent Docker storage for monitoring services
+* Deploy and operate a monitoring platform on AWS EC2
+* Monitor cloud infrastructure and containerised services
+* Configure secure remote administration using SSH
+* Implement cloud-hosted monitoring dashboards
 
 ---
 
 ## Environment
 
-### Host Environment
+### Phase 1 Environment
+
+#### Host Environment
 
 * Windows 11
 * Oracle VirtualBox
 
-### Virtual Machine
+#### Virtual Machine
 
 * Ubuntu Desktop
+
+### Phase 2 Environment
+
+#### Cloud Environment
+
+* AWS EC2
+* AWS IAM
+* AWS Security Groups
+* AWS Budgets
+
+#### Operating System
+
+* Ubuntu Server
 
 ### Monitoring Stack
 
@@ -72,6 +165,7 @@ Access the services:
 * Docker Compose
 * Grafana Alerting
 * SMTP Email Notifications
+* AWS EC2
 
 ### Network Equipment
 
@@ -80,7 +174,6 @@ Access the services:
 ---
 
 ## Architecture
-
 
 Windows Host
     │
@@ -164,6 +257,15 @@ Metrics include:
 | Cloudflare DNS (1.1.1.1) | Internet connectivity monitoring    |
 | Google DNS (8.8.8.8)     | Internet connectivity monitoring    |
 
+### AWS deployment
+
+| Target              | Purpose
+|-------------------- | -------------------------------- |
+| EC2 Instance        | Infrastructure monitoring        |
+| Grafana Service     | Service availability monitoring  |
+| Prometheus Service  | Monitoring platform availability |
+| AWS Website         | External endpoint monitoring     |
+
 ---
 
 ## Key Skills Demonstrated
@@ -185,6 +287,14 @@ This project provided practical experience with:
 * Email notification integration
 * Docker persistent storage management
 * Infrastructure monitoring and alerting
+* AWS EC2 deployment
+* IAM administration
+* Security Group configuration
+* Cloud infrastructure monitoring
+* Cloud-hosted observability platforms
+* Service availability monitoring
+* EC2 troubleshooting
+* Docker deployment in AWS
 
 ---
 
@@ -202,6 +312,14 @@ During the build process several issues were encountered and resolved, including
 * Grafana persistent storage configuration
 * Recovery from container recreation without persistent volumes
 * SMTP integration and email alert configuration
+* EC2 SSH connectivity troubleshooting
+* Security Group configuration and validation
+* GitHub authentication from AWS EC2
+* Public IP management
+* Docker deployment in cloud environments
+* Prometheus target migration from HomeLab to AWS
+* Grafana dashboard recreation following migration
+* Node Exporter host filesystem configuration
 
 Resolving these issues provided valuable experience with troubleshooting Linux and container-based environments.
 
@@ -233,20 +351,21 @@ These challenges provided practical experience with troubleshooting, data persis
 
 Planned enhancements include:
 
-* Deploying the monitoring platform within AWS EC2
-* Implementing Infrastructure as Code using Terraform
-* Adding cAdvisor for container-level monitoring
+* Infrastructure as Code using Terraform
+* Automated Grafana dashboard provisioning
+* cAdvisor container monitoring
 * Monitoring additional Linux hosts
-* Monitoring web services and applications
-* Building custom Grafana dashboards
+* CloudWatch integration
+* CI/CD deployment pipelines
 
 ---
 
 ## Repository Structure
 
-Monitoring/
+homelab-monitoring/
 ├── docker-compose.yml
 ├── prometheus.yml
+├── aws-prometheus.yml
 ├── README.md
 ├── screenshots/
 └── .gitignore
@@ -256,3 +375,4 @@ Monitoring/
 ## Author
 
 This project was developed as part of a personal learning programme focused on infrastructure, cloud technologies and observability tooling.
+
