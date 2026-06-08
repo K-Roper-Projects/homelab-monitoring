@@ -335,6 +335,18 @@ Resolving these issues provided valuable experience with troubleshooting Linux a
 
 <img width="1920" height="955" alt="Network Dash" src="https://github.com/user-attachments/assets/28ca5893-4a17-41c0-abed-c07fe6a9469b" />
 
+### EC2 Monitoring Dashboard
+
+<img width="1590" height="546" alt="EC2 Dash" src="https://github.com/K-Roper-Projects/homelab-monitoring/blob/0ea4b11137cc1329308aa33cdbdbaba9b7ee72f4/Screenshots/AWS-Stack/EC2%20Overview%20Dashboard.png" />
+
+### AWS Website Monitoring Dashboard
+
+<img width="1650" height="545" alt="AWS Web Dash" src="https://github.com/K-Roper-Projects/homelab-monitoring/blob/main/Screenshots/AWS-Stack/AWS%20Website%20Dashboard.png" />
+
+### Docker Container Monitoring Dashboard
+
+<img width="1602" height="679" alt="Docker Dash" src="https://github.com/K-Roper-Projects/homelab-monitoring/blob/main/Screenshots/AWS-Stack/Docker%20Container%20Monitoring%20Dashboard.png" />
+
 ### Lessons Learned
 
 This project highlighted the importance of persistent storage when deploying stateful applications within containers.
