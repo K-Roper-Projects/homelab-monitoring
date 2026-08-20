@@ -695,22 +695,43 @@ Secrets and deployment-specific values are maintained locally through `.env` and
 
 ## Current Development Phase
 
-The HomeLab and AWS monitoring deployments are operational.
+The project has now entered **Phase 3 - Infrastructure as Code using Terraform**.
 
-The next phase of the project is focused on **Infrastructure as Code using Terraform**.
-
-The aim is to move from infrastructure that was originally created manually through the AWS Management Console toward a repeatable, version-controlled deployment.
-
-This will include reviewing the existing AWS environment and progressively defining resources such as:
-
-* EC2
-* Security Groups
-* Networking configuration
-* Storage
-* Instance bootstrap configuration
+The aim of this phase is to move from infrastructure that was originally created manually through the AWS Management Console toward a repeatable, version-controlled deployment.
 
 The existing working AWS deployment will be used as the reference architecture while the Terraform configuration is developed and tested.
 
+### Terraform Milestone 1 - Project Initialisation
+
+The initial Terraform development environment has been established.
+
+Completed work includes:
+
+* Terraform installed and configured on the local development machine
+* AWS CLI installed
+* Short-lived AWS authentication configured using browser-based AWS login
+* Existing IAM user and MFA authentication retained
+* Initial Terraform project structure created
+* Terraform version requirements defined
+* HashiCorp AWS provider configured
+* AWS region configured for `us-east-1`
+* AWS provider dependency constrained to the 6.x release family
+* Provider dependency lock file generated
+* Local Terraform working files excluded from Git source control
+* Terraform state files excluded from Git source control
+* Terraform formatting established using `terraform fmt`
+* Terraform configuration successfully validated using `terraform validate`
+
+Current Terraform project structure:
+
+```text
+Terraform/
+├── main.tf
+├── outputs.tf
+├── providers.tf
+├── variables.tf
+├── versions.tf
+└── .terraform.lock.hcl
 ---
 
 ## Author

@@ -4,3 +4,10 @@ prometheus-data/
 *.log
 .env
 
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
