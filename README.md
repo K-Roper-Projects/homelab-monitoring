@@ -121,6 +121,70 @@ This avoids relying on the dynamically assigned EC2 public IP for internal servi
 
 The AWS deployment demonstrates practical experience with cloud infrastructure, Linux server administration, Docker deployment, monitoring platform migration and cloud-based observability tooling.
 
+### Phase 3 - Infrastructure as Code with Terraform
+
+Following the manual AWS deployment, the infrastructure was recreated using Terraform to introduce Infrastructure as Code (IaC) and provide a repeatable, version-controlled deployment process.
+
+The Terraform configuration provisions the underlying AWS infrastructure required by the monitoring platform, including:
+
+* Dedicated VPC
+* Public subnet
+* Internet Gateway
+* Route table and subnet association
+* Security Group and individual ingress/egress rules
+* EC2 instance
+* Encrypted gp3 EBS root storage
+* Configurable SSH and monitoring access
+* Terraform outputs for deployed resource identifiers and public IP addresses
+
+Terraform variables are used to separate reusable infrastructure definitions from deployment-specific values such as the AWS region, Availability Zone, EC2 instance type, AMI, SSH key pair and trusted CIDR ranges.
+
+Deployment-specific values are stored in a local `terraform.tfvars` file which is excluded from Git source control. A `terraform.tfvars.example` file is included to document the values required for a deployment.
+
+Terraform state is also excluded from Git source control. Local state is currently used while developing and learning the Terraform workflow, with remote state planned as a future enhancement.
+
+The Terraform deployment lifecycle was successfully tested using:
+
+```text
+terraform fmt
+terraform validate
+terraform plan
+terraform apply
+terraform destroy
+```
+
+The complete AWS infrastructure was successfully created, validated and subsequently destroyed using Terraform.
+
+#### Automated EC2 Bootstrap
+
+EC2 User Data and `cloud-init` were introduced to automate the initial configuration of newly created instances.
+
+A version-controlled bootstrap script automatically:
+
+* Updates the Ubuntu package repositories
+* Applies available operating system package updates
+* Configures Docker's official Ubuntu package repository
+* Installs Docker Engine
+* Installs Docker Compose
+* Enables and starts the Docker service
+* Adds the Ubuntu user to the Docker group
+
+The bootstrap process was tested against a newly created Ubuntu 24.04 LTS EC2 instance.
+
+Following deployment, validation confirmed:
+
+```text
+cloud-init status: done
+Docker Engine: installed
+Docker Compose: installed
+Docker service: active
+Ubuntu user: member of docker group
+```
+
+A test container was successfully launched without `sudo`, confirming that the instance could be created from a clean AMI and automatically configured as a Docker-ready host without manual package installation.
+
+The infrastructure was then successfully removed using `terraform destroy`, demonstrating that the Terraform environment can be treated as disposable and recreated when required.
+
 ---
 
 ## Environment-Specific Configuration
@@ -182,6 +246,21 @@ If `PROMETHEUS_CONFIG` is not defined, the HomeLab configuration is used as the 
 
 This allows the same Docker Compose file to be used in multiple environments without manually editing the Compose configuration between deployments.
 
+## Terraform Project Structure
+
+The AWS Infrastructure as Code configuration is stored separately from the monitoring application configuration:
+
+```text
+Terraform/
+├── main.tf
+├── outputs.tf
+├── providers.tf
+├── terraform.tfvars.example
+├── variables.tf
+├── versions.tf
+└── scripts/
+    └── bootstrap.sh
+	
 ---
 
 ## Environment Variables
@@ -278,6 +357,12 @@ In AWS, Grafana and Prometheus are accessed using the current EC2 public IP wher
 * Implement cloud-hosted monitoring dashboards
 * Support multiple deployment environments from a common codebase
 * Separate environment-specific monitoring configuration from the core Docker deployment
+* Implement Infrastructure as Code using Terraform
+* Provision AWS networking, security, compute and storage using Terraform
+* Separate reusable Terraform configuration from deployment-specific inputs
+* Automate initial EC2 configuration using User Data and cloud-init
+* Automatically install and configure Docker on newly provisioned EC2 instances
+* Implement disposable AWS development infrastructure using Terraform lifecycle management
 
 ---
 
@@ -322,6 +407,29 @@ In AWS, Grafana and Prometheus are accessed using the current EC2 public IP wher
 ### HomeLab Network Equipment
 
 * Zyxel NR5103E 5G Router
+
+### Phase 3 Environment
+
+#### Infrastructure as Code
+
+* Terraform
+* HashiCorp AWS Provider
+* HCL
+* Terraform variables and deployment-specific tfvars
+* Terraform state
+* EC2 User Data
+* cloud-init
+* Bash bootstrap scripting
+
+#### Terraform-Managed AWS Resources
+
+* Amazon VPC
+* Public subnet
+* Internet Gateway
+* Route table
+* Security Group
+* Amazon EC2
+* Encrypted Amazon EBS gp3 storage
 
 ---
 
@@ -374,6 +482,36 @@ Grafana data is stored using a persistent Docker volume mapped to:
 
 This allows dashboards, users and Grafana configuration to survive container recreation.
 
+### Terraform AWS Infrastructure
+
+```text
+Terraform
+    │
+    ├── VPC
+    │    │
+    │    ├── Public Subnet
+    │    │
+    │    ├── Internet Gateway
+    │    │
+    │    └── Route Table
+    │    │
+    └── Security Group
+    │         ├── SSH :22
+    │         ├── Grafana :3000
+    │         └── Prometheus :9090
+    │
+    └── EC2 Ubuntu Server
+             │
+             ├── Encrypted gp3 EBS
+             │
+             └── cloud-init / User Data
+                       │
+                       └── bootstrap.sh
+                              │
+                              ├── OS updates
+                              ├── Docker Engine
+                              └── Docker Compose
+							  
 ---
 
 ## Dashboards
@@ -534,13 +672,21 @@ Persistent storage became an important part of the project after an earlier cont
 Several security controls are used within the project:
 
 * SSH key-based authentication
-* AWS IAM user administration
+* AWS IAM and MFA-backed administrative authentication
 * AWS Security Groups
 * Restricted inbound access
 * Environment variables for application credentials
 * `.env` excluded from Git source control
 * Google App Password used for Grafana SMTP authentication
 * No application secrets stored directly in `docker-compose.yml`
+* MFA-backed temporary AWS authentication used for local Terraform administration
+* No AWS credentials stored within Terraform configuration
+* SSH and monitoring access controlled using separate configurable CIDR variables
+* Unused HTTP and HTTPS Security Group rules removed following least-privilege review
+* EC2 root EBS volumes encrypted at rest
+* Terraform state excluded from Git source control
+* Deployment-specific `terraform.tfvars` excluded from Git source control
+* Terraform saved plan files excluded from Git source control
 
 AWS Security Group rules restrict administrative and monitoring access rather than exposing management services unnecessarily to the public internet.
 
@@ -576,6 +722,25 @@ This project provided practical experience with:
 * Docker deployment in AWS
 * Environment-specific configuration
 * Secret management using environment variables
+* Infrastructure as Code (IaC)
+* Terraform
+* HCL configuration
+* Terraform provider configuration
+* Terraform variables and outputs
+* Terraform dependency management
+* Terraform state management
+* Terraform plan and apply workflows
+* Terraform resource lifecycle management
+* Automated AWS infrastructure provisioning
+* Amazon VPC networking
+* Internet Gateway and route table configuration
+* EC2 User Data
+* cloud-init
+* Bash bootstrap scripting
+* Automated Docker installation
+* EBS encryption
+* Infrastructure teardown using Terraform
+* Infrastructure cost and lifecycle management
 
 ---
 
@@ -606,6 +771,16 @@ During the build and migration process several issues were encountered and resol
 * Recovering and validating the AWS monitoring environment after an extended shutdown
 * Updating the EC2 operating system and AWS kernel
 * Preserving Grafana dashboards using persistent Docker storage
+* Designing a reusable Terraform project structure
+* Separating deployment-specific Terraform values from reusable infrastructure code
+* Understanding Terraform state and resource relationships
+* Managing Terraform resource dependencies using resource references
+* Configuring least-privilege Security Group rules through Terraform
+* Managing EC2 replacement following User Data changes
+* Identifying and removing an orphaned EBS volume following EC2 replacement
+* Automating Docker installation through EC2 User Data and cloud-init
+* Validating automated bootstrap behaviour on a clean EC2 deployment
+* Testing complete Terraform create and destroy lifecycles
 
 Resolving these issues provided practical experience with troubleshooting Linux, container-based and cloud-hosted environments.
 
@@ -651,16 +826,22 @@ Additional experience was gained configuring SMTP integration, automated alert n
 
 These challenges provided practical experience with troubleshooting, data persistence, configuration management and operational monitoring concepts.
 
+The introduction of Terraform demonstrated the difference between defining infrastructure and manually creating cloud resources. Terraform resource references were used to establish dependencies between the VPC, subnet, Internet Gateway, route table, Security Group and EC2 instance without manually copying AWS resource identifiers between configurations.
+
+Terraform state became an important part of the deployment lifecycle by maintaining the relationship between resources defined in HCL and the corresponding resources created within AWS.
+
+The project also demonstrated the importance of reviewing resource lifecycle behaviour. During an EC2 replacement test, the original EBS root volume remained after instance termination because it had initially been created with `delete_on_termination` disabled. The orphaned volume was identified and removed, and the disposable Terraform deployment was subsequently configured to delete its root volume on termination.
+
+EC2 User Data and cloud-init were then used to move configuration away from manual server administration. A clean Ubuntu EC2 instance was successfully provisioned and automatically configured with Docker Engine and Docker Compose without manually installing packages over SSH.
+
+This established a clear separation between infrastructure provisioning and application deployment and provides the foundation for fully automated deployment of the monitoring stack in the next phase.
+
 ---
 
 ## Future Improvements
 
 Planned enhancements include:
 
-* Infrastructure as Code using Terraform
-* Automated EC2 provisioning
-* Automated operating system bootstrap and initial patching
-* Automated Docker installation and configuration
 * Automated deployment of the monitoring stack
 * Improved secrets management
 * Automated Grafana dashboard provisioning
@@ -670,6 +851,16 @@ Planned enhancements include:
 * CI/CD deployment pipelines
 * Further Grafana alerting and reporting
 * Infrastructure recovery and repeatable deployment testing
+* Remote Terraform state using an appropriate backend
+* Terraform state locking and recovery strategy
+* Dedicated IAM roles for workloads and automated deployments
+* GitHub Actions authentication to AWS using OIDC
+* Terraform modules for reusable infrastructure components
+* Multiple Terraform deployment environments
+* Automated monitoring stack deployment following infrastructure provisioning
+* AWS Secrets Manager integration for application credentials
+* Reverse proxy and HTTPS access for monitoring interfaces
+* Review of multi-AZ and scaling options as the platform evolves
 
 ---
 
@@ -677,6 +868,16 @@ Planned enhancements include:
 
 ```text
 homelab-monitoring/
+├── Terraform/
+│   ├── main.tf
+│   ├── outputs.tf
+│   ├── providers.tf
+│   ├── terraform.tfvars.example
+│   ├── variables.tf
+│   ├── versions.tf
+│   ├── .terraform.lock.hcl
+│   └── scripts/
+│       └── bootstrap.sh
 ├── docker-compose.yml
 ├── prometheus/
 │   ├── homelab.yml
@@ -687,7 +888,7 @@ homelab-monitoring/
 └── .env                 # Local only - excluded from Git
 ```
 
-The repository contains the common Docker Compose deployment and environment-specific Prometheus configurations.
+The repository contains the common Docker Compose deployment, environment-specific Prometheus configurations and Terraform Infrastructure as Code used to provision the AWS environment.
 
 Secrets and deployment-specific values are maintained locally through `.env` and are not committed to source control.
 
@@ -695,15 +896,15 @@ Secrets and deployment-specific values are maintained locally through `.env` and
 
 ## Current Development Phase
 
-The project has now entered **Phase 3 - Infrastructure as Code using Terraform**.
+The project has now completed **Terraform Milestone 3 - AWS Infrastructure Provisioning and EC2 Bootstrap** and is ready to begin Milestone 4.
 
-The aim of this phase is to move from infrastructure that was originally created manually through the AWS Management Console toward a repeatable, version-controlled deployment.
+The aim of the Terraform phase is to move from infrastructure that was originally created manually through the AWS Management Console toward a repeatable, version-controlled and increasingly automated deployment.
 
-The existing working AWS deployment will be used as the reference architecture while the Terraform configuration is developed and tested.
+The existing working AWS deployment remains the reference architecture while the Terraform configuration is developed and tested.
 
 ### Terraform Milestone 1 - Project Initialisation
 
-The initial Terraform development environment has been established.
+The initial Terraform development environment was established.
 
 Completed work includes:
 
@@ -722,7 +923,7 @@ Completed work includes:
 * Terraform formatting established using `terraform fmt`
 * Terraform configuration successfully validated using `terraform validate`
 
-Current Terraform project structure:
+Initial Terraform project structure:
 
 ```text
 Terraform/
@@ -732,6 +933,74 @@ Terraform/
 ├── variables.tf
 ├── versions.tf
 └── .terraform.lock.hcl
+```
+
+### Terraform Milestone 2 - Reusable Configuration Inputs
+
+Terraform inputs were introduced to separate reusable infrastructure configuration from deployment-specific values.
+
+Completed work includes:
+
+* AWS region and Availability Zone variables
+* EC2 instance type and AMI variables
+* SSH key pair configuration
+* Separate trusted CIDR ranges for SSH and monitoring access
+* VPC and subnet CIDR configuration
+* EBS size, type, encryption and lifecycle configuration
+* Deployment-specific values stored in `terraform.tfvars`
+* `terraform.tfvars` excluded from Git source control
+* Reusable `terraform.tfvars.example` committed to the repository
+
+### Terraform Milestone 3 - AWS Infrastructure Provisioning
+
+Terraform was used to provision and validate a complete disposable AWS infrastructure environment.
+
+Completed work includes:
+
+* Dedicated VPC
+* Public subnet
+* Internet Gateway
+* Route table and subnet association
+* Security Group with least-privilege ingress rules
+* EC2 instance provisioning
+* Encrypted gp3 EBS root storage
+* Terraform outputs
+* Terraform state validation
+* EC2 User Data integration
+* Automated Ubuntu bootstrap using cloud-init
+* Automated Docker Engine installation
+* Automated Docker Compose installation
+* Docker service enablement
+* Docker group configuration
+* Successful Docker container execution without sudo
+* Successful infrastructure teardown using `terraform destroy`
+
+Milestone 3 demonstrated the complete Terraform lifecycle from configuration and planning through deployment, automated host bootstrap, validation and destruction.
+
+### Terraform Milestone 4 - Automated Monitoring Stack Deployment
+
+The next phase will extend the automated bootstrap process beyond creation of a Docker-ready EC2 host.
+
+Planned work will investigate and implement a suitable method for automatically delivering the monitoring application configuration to the EC2 instance and starting the Docker Compose monitoring stack.
+
+This will move the deployment toward:
+
+```text
+terraform apply
+    ↓
+AWS infrastructure
+    ↓
+EC2 bootstrap
+    ↓
+Docker installation
+    ↓
+Monitoring configuration deployment
+    ↓
+Docker Compose
+    ↓
+Operational Grafana and Prometheus platform
+```
+
 ---
 
 ## Author
