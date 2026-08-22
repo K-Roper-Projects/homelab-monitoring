@@ -10,8 +10,13 @@ prometheus-data/
 *.tfstate.*
 crash.log
 crash.*.log
+
 # Local Terraform variable values
 terraform.tfvars
 *.auto.tfvars
+
+# Terraform saved plan files
+*.tfplan
+tfplan
 
 

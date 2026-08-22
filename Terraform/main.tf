@@ -64,24 +64,6 @@ resource "aws_vpc_security_group_ingress_rule" "ssh" {
   cidr_ipv4         = var.allowed_ssh_cidr
 }
 
-resource "aws_vpc_security_group_ingress_rule" "http" {
-  security_group_id = aws_security_group.monitoring.id
-  description       = "Allow HTTP access from trusted monitoring network"
-  from_port         = 80
-  to_port           = 80
-  ip_protocol       = "tcp"
-  cidr_ipv4         = var.allowed_monitoring_cidr
-}
-
-resource "aws_vpc_security_group_ingress_rule" "https" {
-  security_group_id = aws_security_group.monitoring.id
-  description       = "Allow HTTPS access from trusted monitoring network"
-  from_port         = 443
-  to_port           = 443
-  ip_protocol       = "tcp"
-  cidr_ipv4         = var.allowed_monitoring_cidr
-}
-
 resource "aws_vpc_security_group_ingress_rule" "grafana" {
   security_group_id = aws_security_group.monitoring.id
   description       = "Allow Grafana access from trusted monitoring network"
@@ -118,6 +100,7 @@ resource "aws_instance" "monitoring" {
     volume_size           = var.root_volume_size
     volume_type           = var.root_volume_type
     delete_on_termination = var.root_volume_delete_on_termination
+    encrypted             = var.root_volume_encrypted
   }
 
   tags = {

@@ -37,6 +37,12 @@ variable "root_volume_type" {
   default     = "gp3"
 }
 
+variable "root_volume_encrypted" {
+  description = "Whether the EC2 root EBS volume is encrypted"
+  type        = bool
+  default     = true
+}
+
 variable "root_volume_delete_on_termination" {
   description = "Whether the EC2 root EBS volume is deleted when the instance is terminated"
   type        = bool
