@@ -96,6 +96,9 @@ resource "aws_instance" "monitoring" {
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.monitoring.id]
 
+  user_data                   = file("${path.module}/scripts/bootstrap.sh")
+  user_data_replace_on_change = true
+
   root_block_device {
     volume_size           = var.root_volume_size
     volume_type           = var.root_volume_type
