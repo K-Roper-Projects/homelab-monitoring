@@ -53,3 +53,21 @@ variable "instance_name" {
   type        = string
   default     = "Monitoring-Server"
 }
+
+variable "vpc_cidr" {
+  description = "CIDR block used by the monitoring VPC"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "public_subnet_cidr" {
+  description = "CIDR block used by the public monitoring subnet"
+  type        = string
+  default     = "10.0.1.0/24"
+}
+
+variable "availability_zone" {
+  description = "Availability Zone used by the monitoring public subnet"
+  type        = string
+  default     = "us-east-1a"
+}
