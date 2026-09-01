@@ -17,7 +17,7 @@ scrape_configs:
       module: [icmp]
     static_configs:
       - targets:
-          - 192.168.1.1
+          - 192.168.0.1
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
