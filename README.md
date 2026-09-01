@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project was created to gain hands-on experience with infrastructure monitoring, Linux administration, containerisation, cloud deployment, Infrastructure as Code, secure remote administration and observability tooling.
+This project was created to gain hands-on experience with infrastructure monitoring, Linux administration, containerisation, cloud deployment, Infrastructure as Code, secure remote administration, automation and observability tooling.
 
 The project began as a locally hosted monitoring platform running on an Ubuntu virtual machine and was later extended into a cloud-hosted deployment on AWS EC2.
 
@@ -13,9 +13,9 @@ The monitoring stack is deployed using Docker Compose and consists of:
 * Node Exporter
 * Blackbox Exporter
 
-Prometheus is used to collect and store metrics, Grafana provides dashboards and visualisation, Node Exporter collects host-level infrastructure metrics, and Blackbox Exporter is used to monitor service availability and network connectivity.
+Prometheus collects and stores metrics, Grafana provides dashboards and visualisation, Node Exporter exposes host-level infrastructure metrics, and Blackbox Exporter monitors network and service availability.
 
-The same Docker Compose deployment is used across both the HomeLab and AWS environments. Environment-specific Prometheus configuration files define the appropriate monitoring targets for each platform.
+The same Docker Compose deployment is used across both the HomeLab and AWS environments. Environment-specific Prometheus configuration files define the monitoring targets appropriate to each platform.
 
 Grafana Alerting and SMTP email notifications provide proactive monitoring and automated incident notification.
 
@@ -28,6 +28,10 @@ The project has subsequently been extended with:
 * Remote Windows administration using RustDesk
 * Direct SSH administration of the HomeLab VM
 * Remote Grafana and Prometheus access
+* Automatic Docker monitoring-stack recovery
+* Ubuntu maintenance-state monitoring
+* Custom Prometheus metrics using the Node Exporter textfile collector
+* Grafana alerting for operating-system reboot requirements
 
 The primary goal of the project is to design, deploy, troubleshoot and document a complete monitoring solution while gaining practical experience with technologies and working practices commonly used within cloud, infrastructure, platform engineering and DevOps environments.
 
@@ -56,7 +60,7 @@ Additional functionality included:
 * SMTP email notifications
 * Persistent Docker volumes
 * GitHub source control
-* SSH authentication
+* SSH administration
 
 The HomeLab deployment provided practical experience with Linux administration, containerisation, observability tooling and infrastructure monitoring concepts.
 
@@ -118,9 +122,7 @@ Monitors:
 * Service response times
 * Historical service uptime
 
-The Grafana and Prometheus containers are monitored internally across the Docker Compose network using their Docker service names.
-
-For example:
+The Grafana and Prometheus containers are monitored internally across the Docker Compose network using their Docker service names:
 
 ```text
 http://grafana:3000
@@ -129,13 +131,11 @@ http://prometheus:9090
 
 This avoids relying on the dynamically assigned EC2 public IP for internal service monitoring.
 
-The AWS deployment demonstrates practical experience with cloud infrastructure, Linux server administration, Docker deployment, monitoring platform migration and cloud-based observability tooling.
-
 ### Phase 3 - Infrastructure as Code with Terraform
 
-Following the manual AWS deployment, the infrastructure was recreated using Terraform to introduce Infrastructure as Code (IaC) and provide a repeatable, version-controlled deployment process.
+Following the manual AWS deployment, the infrastructure was recreated using Terraform to introduce Infrastructure as Code and provide a repeatable, version-controlled deployment process.
 
-The Terraform configuration provisions the underlying AWS infrastructure required by the monitoring platform, including:
+The Terraform configuration provisions:
 
 * Dedicated VPC
 * Public subnet
@@ -147,9 +147,9 @@ The Terraform configuration provisions the underlying AWS infrastructure require
 * Configurable SSH and monitoring access
 * Terraform outputs for deployed resource identifiers and public IP addresses
 
-Terraform variables are used to separate reusable infrastructure definitions from deployment-specific values such as the AWS region, Availability Zone, EC2 instance type, AMI, SSH key pair and trusted CIDR ranges.
+Terraform variables separate reusable infrastructure definitions from deployment-specific values including AWS region, Availability Zone, EC2 instance type, AMI, SSH key pair and trusted CIDR ranges.
 
-Deployment-specific values are stored in a local `terraform.tfvars` file which is excluded from Git source control. A `terraform.tfvars.example` file is included to document the values required for a deployment.
+Deployment-specific values are stored in a local `terraform.tfvars` file which is excluded from Git source control. A `terraform.tfvars.example` file documents the required values.
 
 Terraform state is also excluded from Git source control. Local state is currently used while developing and learning the Terraform workflow, with remote state planned as a future enhancement.
 
@@ -171,8 +171,8 @@ EC2 User Data and `cloud-init` were introduced to automate the initial configura
 
 A version-controlled bootstrap script automatically:
 
-* Updates the Ubuntu package repositories
-* Applies available operating system package updates
+* Updates Ubuntu package repositories
+* Applies available operating-system package updates
 * Configures Docker's official Ubuntu package repository
 * Installs Docker Engine
 * Installs Docker Compose
@@ -278,6 +278,189 @@ Detailed implementation, validation, security and troubleshooting information is
 
 [`docs/remote-access.md`](docs/remote-access.md)
 
+### Phase 5 - HomeLab Reliability and Maintenance Monitoring
+
+The HomeLab environment was extended to improve automatic recovery and provide visibility into the maintenance state of the Ubuntu VM.
+
+#### Docker Monitoring-Stack Recovery
+
+All four monitoring containers are configured with:
+
+```yaml
+restart: unless-stopped
+```
+
+This applies to:
+
+* Prometheus
+* Grafana
+* Node Exporter
+* Blackbox Exporter
+
+A complete Ubuntu VM reboot was performed to validate recovery.
+
+After the VM restarted:
+
+* Docker started automatically
+* Prometheus recovered automatically
+* Grafana recovered automatically
+* Node Exporter recovered automatically
+* Blackbox Exporter recovered automatically
+* Existing Grafana dashboards remained available
+* Prometheus monitoring targets returned to a healthy state
+
+No manual `docker compose up -d` command was required.
+
+#### Ubuntu Automatic Maintenance
+
+Ubuntu's native `unattended-upgrades` mechanism was reviewed and validated rather than introducing a separate boot-time update script.
+
+Automatic package-list refreshes and unattended upgrades are enabled through:
+
+```text
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+```
+
+The associated systemd timers are:
+
+```text
+apt-daily.timer
+apt-daily-upgrade.timer
+```
+
+Both use:
+
+```text
+Persistent=true
+```
+
+This means missed scheduled maintenance can be rescheduled when the VM is next started after being offline.
+
+Automatic operating-system rebooting is not enabled. Reboots remain a deliberate administrative action.
+
+#### Operating-System Maintenance Metrics
+
+A custom Bash script:
+
+```text
+check-updates.sh
+```
+
+collects:
+
+* Number of pending APT package upgrades
+* Whether `/var/run/reboot-required` exists
+
+The script generates a Prometheus textfile:
+
+```text
+node-exporter-textfile/apt_updates.prom
+```
+
+containing:
+
+```text
+homelab_pending_updates
+homelab_reboot_required
+```
+
+Node Exporter is configured with the textfile collector:
+
+```text
+--collector.textfile.directory=/textfile
+```
+
+The generated metrics directory is mounted read-only into the Node Exporter container.
+
+A dedicated systemd service and timer refresh the maintenance metrics automatically:
+
+```text
+homelab-update-metrics.service
+homelab-update-metrics.timer
+```
+
+The timer runs hourly and uses `Persistent=true`.
+
+The monitoring path is:
+
+```text
+Ubuntu APT state
+      │
+      ▼
+check-updates.sh
+      │
+      ▼
+apt_updates.prom
+      │
+      ▼
+Node Exporter
+      │
+      ▼
+Prometheus
+      │
+      ▼
+Grafana
+```
+
+#### HomeLab Maintenance Dashboard
+
+A dedicated Grafana dashboard named **HomeLab Maintenance** displays:
+
+* Pending Updates
+* Reboot Required
+
+The reboot metric uses:
+
+```text
+0 = No
+1 = Yes
+```
+
+A Grafana alert rule monitors:
+
+```promql
+homelab_reboot_required > 0
+```
+
+The rule is evaluated every five minutes with no pending period.
+
+#### Maintenance Validation
+
+The implementation was validated end-to-end.
+
+The initial state reported:
+
+```text
+homelab_pending_updates 22
+homelab_reboot_required 0
+```
+
+Seventeen standard security updates were installed.
+
+Five normal Ubuntu updates remained temporarily withheld through phased deployment.
+
+After refreshing the maintenance metric service, the platform reported:
+
+```text
+homelab_pending_updates 5
+homelab_reboot_required 0
+```
+
+Prometheus collected the updated metric and the Grafana dashboard automatically changed from 22 pending updates to 5.
+
+The reboot-required monitoring path was also tested by temporarily simulating:
+
+```text
+homelab_reboot_required 1
+```
+
+Node Exporter exposed the changed metric, Prometheus collected it, the Grafana dashboard changed to a red `Yes` state and the reboot-required alert rule was triggered.
+
+The simulated condition was then removed and the genuine operating-system state restored.
+
+This validates the complete path from Ubuntu maintenance state through Node Exporter, Prometheus, Grafana and Grafana Alerting.
+
 ---
 
 ## Environment-Specific Configuration
@@ -311,6 +494,7 @@ This configuration monitors:
 * Google DNS
 * Internet connectivity
 * Network latency
+* Custom HomeLab maintenance metrics
 
 ### AWS
 
@@ -356,6 +540,27 @@ Terraform/
 └── scripts/
     └── bootstrap.sh
 ```
+
+---
+
+## HomeLab Maintenance Project Structure
+
+The maintenance-monitoring components are stored in the repository alongside the monitoring stack:
+
+```text
+check-updates.sh
+systemd/
+├── homelab-update-metrics.service
+└── homelab-update-metrics.timer
+```
+
+Generated metric files are written to:
+
+```text
+node-exporter-textfile/
+```
+
+This directory is excluded from Git source control because its contents are generated runtime data.
 
 ---
 
@@ -472,6 +677,11 @@ In AWS, Grafana and Prometheus are accessed using the current EC2 public IP wher
 * Provide remote graphical administration of the Windows host
 * Avoid exposing HomeLab management services through public Internet port forwarding
 * Validate recovery of remote-management services following a VM reboot
+* Automatically recover the Docker monitoring stack after a VM reboot
+* Monitor pending Ubuntu package updates
+* Monitor operating-system reboot requirements
+* Expose custom operating-system metrics using Node Exporter
+* Alert when the HomeLab VM requires a reboot
 
 ---
 
@@ -489,6 +699,8 @@ In AWS, Grafana and Prometheus are accessed using the current EC2 public IP wher
 * Ubuntu Desktop
 * OpenSSH
 * Tailscale
+* unattended-upgrades
+* systemd
 
 #### Remote Access
 
@@ -573,15 +785,21 @@ In AWS, Grafana and Prometheus are accessed using the current EC2 public IP wher
                                          :22     :3000     :9090
                                                     │
                                                Docker Compose
-                                         ┌──────────┼──────────┐
-                                         │          │          │
-                                    Prometheus   Grafana    Exporters
-                                         │
-                                    Local Network
-                                         │
-                                  Internet Gateway
-                                         │
-                                      Internet
+                                  ┌─────────────────┼──────────────────┐
+                                  │                 │                  │
+                             Prometheus          Grafana           Exporters
+                                  │                                    │
+                                  │                              Node Exporter
+                                  │                                    │
+                                  │                           Textfile Collector
+                                  │                                    │
+                                  │                           apt_updates.prom
+                                  │                                    │
+                                  └──────────────────┬─────────────────┘
+                                                     │
+                                              Ubuntu VM State
+                                             ├── APT Updates
+                                             └── Reboot Required
 ```
 
 Remote management traffic is carried across the private Tailscale network.
@@ -684,6 +902,31 @@ The Node Exporter Full dashboard provides detailed host-level visibility using m
 
 It provides more extensive Linux system information including CPU, memory, filesystem, networking, system load and other host metrics.
 
+### HomeLab Maintenance Dashboard
+
+The HomeLab Maintenance dashboard provides visibility into the Ubuntu VM's operating-system maintenance state.
+
+It currently displays:
+
+* Pending package-update count
+* Reboot-required status
+
+The dashboard uses the custom Prometheus metrics:
+
+```text
+homelab_pending_updates
+homelab_reboot_required
+```
+
+The reboot-required panel maps:
+
+```text
+0 = No
+1 = Yes
+```
+
+and uses visual state changes so a required reboot is immediately visible.
+
 ### EC2 Monitoring Dashboard
 
 The EC2 Monitoring Dashboard provides visibility into the AWS-hosted Ubuntu server.
@@ -738,9 +981,9 @@ Grafana Alerting provides automated email notifications when predefined monitori
 
 Alert notifications are delivered via SMTP using a dedicated project email account.
 
-Configured HomeLab alert rules include:
-
 ### Network Alerts
+
+Configured HomeLab network alert rules include:
 
 * Internet Connectivity Lost
 * Router Unreachable
@@ -763,6 +1006,27 @@ Health = OK
 
 This demonstrated the distinction between Prometheus target configuration, Grafana dashboard queries and Grafana alert-rule queries.
 
+### VM Maintenance Alert
+
+A dedicated Grafana rule monitors:
+
+```promql
+homelab_reboot_required > 0
+```
+
+The rule is evaluated every five minutes with a zero-second pending period.
+
+The alert path was tested by temporarily setting the metric to `1`.
+
+Validation confirmed:
+
+* Node Exporter exposed the changed metric
+* Prometheus collected the value
+* Grafana displayed `Reboot Required = Yes`
+* The panel changed to its warning state
+* The Grafana alert rule entered the alerting state
+* The genuine Ubuntu state was subsequently restored
+
 ---
 
 ## Monitoring Targets
@@ -772,6 +1036,7 @@ This demonstrated the distinction between Prometheus target configuration, Grafa
 | Target | Purpose |
 |---|---|
 | Ubuntu VM | Host performance and resource utilisation |
+| Node Exporter maintenance metrics | Pending updates and reboot-required state |
 | Docker Containers | Monitoring services running within the VM |
 
 ### HomeLab Network
@@ -841,6 +1106,8 @@ Several security controls are used within the project.
 * RustDesk direct IP connectivity carried across Tailscale
 * SSH available through the private Tailscale network
 * Tailscale and SSH automatically recover following an Ubuntu VM reboot
+* Docker monitoring services automatically recover following an Ubuntu VM reboot
+* Automatic operating-system rebooting is not enabled
 
 ### Application and Repository Security
 
@@ -849,6 +1116,7 @@ Several security controls are used within the project.
 * Google App Password used for Grafana SMTP authentication
 * No application secrets stored directly in `docker-compose.yml`
 * Credentials and secrets excluded from the repository
+* Generated Node Exporter textfile metrics excluded from Git source control
 
 ### AWS
 
@@ -927,14 +1195,26 @@ Following reboot:
 
 ### Monitoring Recovery
 
-Following startup of the Docker Compose monitoring stack:
+Docker Compose restart policies are configured using `restart: unless-stopped` for:
 
-* Grafana started successfully
-* Prometheus started successfully
-* Node Exporter started successfully
-* Blackbox Exporter started successfully
+* Grafana
+* Prometheus
+* Node Exporter
+* Blackbox Exporter
+
+A complete Ubuntu VM reboot was performed to validate automatic recovery.
+
+Following reboot:
+
+* Docker started automatically
+* Grafana recovered automatically
+* Prometheus recovered automatically
+* Node Exporter recovered automatically
+* Blackbox Exporter recovered automatically
 * Persistent Grafana dashboards remained available
 * Prometheus monitoring targets reported healthy
+
+No manual `docker compose up -d` command was required following the reboot.
 
 ### Network Monitoring Change
 
@@ -953,6 +1233,34 @@ Grafana SMTP alerting successfully generated:
 
 This provided a real operational validation of the monitoring and alerting pipeline.
 
+### Operating-System Maintenance Monitoring
+
+Ubuntu automatic-update configuration and operating-system maintenance monitoring were validated.
+
+The VM uses Ubuntu's native unattended-upgrade mechanism with persistent systemd timers.
+
+Custom Node Exporter metrics report:
+
+```text
+homelab_pending_updates
+homelab_reboot_required
+```
+
+During validation:
+
+* 22 pending package updates were initially detected
+* 17 security updates were successfully installed
+* 5 phased Ubuntu updates remained pending
+* The maintenance metric updated from 22 to 5
+* No operating-system reboot was required
+* Prometheus successfully collected the updated metric
+* The HomeLab Maintenance Grafana dashboard reflected the new value
+* A simulated reboot-required condition changed the Grafana status from `No` to `Yes`
+* The reboot-required Grafana alert rule was successfully triggered
+* The genuine operating-system state was subsequently restored
+
+This validated the complete maintenance-monitoring path from Ubuntu through Node Exporter, Prometheus, Grafana and Grafana Alerting.
+
 ---
 
 ## Current Status
@@ -966,6 +1274,7 @@ This provided a real operational validation of the monitoring and alerting pipel
 * Blackbox Exporter operational
 * Network Health dashboard operational
 * Node Exporter dashboard operational
+* HomeLab Maintenance dashboard operational
 * Grafana SMTP alerting operational
 * Persistent Grafana storage operational
 * Tailscale remote connectivity operational
@@ -973,6 +1282,11 @@ This provided a real operational validation of the monitoring and alerting pipel
 * RustDesk Windows administration operational
 * Direct remote Grafana access operational
 * Direct remote Prometheus access operational
+* Ubuntu unattended security-update mechanism operational
+* Pending package-update monitoring operational
+* Operating-system reboot-required monitoring operational
+* VM reboot-required Grafana alerting operational
+* Docker monitoring-stack automatic reboot recovery validated
 
 ### AWS
 
@@ -990,16 +1304,43 @@ This provided a real operational validation of the monitoring and alerting pipel
 | Phase 2 | Direct Ubuntu administration using SSH over Tailscale | Complete |
 | Phase 3 | Direct Grafana and Prometheus access over Tailscale | Complete |
 
+### Reliability and Maintenance
+
+| Capability | Status |
+|---|---|
+| Docker container restart policies | Complete |
+| Full monitoring-stack VM reboot recovery | Complete |
+| Ubuntu unattended-upgrade validation | Complete |
+| Pending update monitoring | Complete |
+| Reboot-required monitoring | Complete |
+| Grafana VM reboot alert | Complete |
+
+---
+
+## Known Limitations
+
+* The Windows host must remain powered on and awake for the HomeLab VM to remain available.
+* Reliable Wake-on-WLAN has not been established.
+* Automatic startup of the VirtualBox VM following a Windows host restart has not yet been implemented or validated.
+* Prometheus currently publishes port `9090` on all VM interfaces.
+* SSH password authentication is still used for some HomeLab administration.
+* The VirtualBox clipboard client has previously failed to restart automatically after an Ubuntu reboot.
+
 ---
 
 ## Future Enhancements
 
 Potential future improvements include:
 
-* Configure automatic startup/restart policies for the Docker monitoring stack
-* Validate full monitoring-platform recovery following a HomeLab VM reboot
 * Further restrict management-service exposure to the Tailscale interface where appropriate
 * Implement SSH key-based authentication for mobile HomeLab administration
+* Disable SSH password authentication after key-based access has been validated
+* Introduce more restrictive Tailscale ACLs if additional devices or users are added
+* Investigate automatic startup of the HomeLab VM following a Windows host reboot
+* Configure persistent VirtualBox clipboard-client startup
+* Replace the hard-coded router IP in the Grafana alert rule with the `router-ping` job label
+* Consider separating security-update and general package-update counts into individual Prometheus metrics
+* Consider monitoring Docker container health and restart behaviour through Prometheus/Grafana
 * Introduce remote Terraform state
 * Add Terraform state locking
 * Continue improving reusable Terraform configuration
@@ -1021,17 +1362,21 @@ Potential future improvements include:
 * Blackbox Exporter
 * Grafana Alerting
 * SMTP
+* Prometheus textfile collector
 
 ### Containers
 
 * Docker
 * Docker Compose
 
-### Operating Systems
+### Operating Systems and Automation
 
 * Ubuntu Desktop
 * Ubuntu Server
 * Windows 11
+* systemd
+* unattended-upgrades
+* Bash
 
 ### Cloud
 
@@ -1048,7 +1393,6 @@ Potential future improvements include:
 * HCL
 * cloud-init
 * EC2 User Data
-* Bash
 
 ### Remote Access and Administration
 
@@ -1078,5 +1422,9 @@ The project is maintained as a practical learning environment and portfolio demo
 * Infrastructure as Code
 * Automation
 * Secure remote administration
+* System maintenance
+* Custom Prometheus metrics
+* Grafana alerting
+* Service recovery
 * Troubleshooting
 * Operational validation
