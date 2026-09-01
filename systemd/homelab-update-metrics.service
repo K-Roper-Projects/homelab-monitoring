@@ -1,0 +1,7 @@
+[Unit]
+Description=Generate HomeLab update metrics for Prometheus
+
+[Service]
+Type=oneshot
+User=kevin
+ExecStart=/home/kevin/HomeLab/Monitoring/check-updates.sh

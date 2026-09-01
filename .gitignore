@@ -20,3 +20,4 @@ terraform.tfvars
 tfplan
 
 
+node-exporter-textfile/
