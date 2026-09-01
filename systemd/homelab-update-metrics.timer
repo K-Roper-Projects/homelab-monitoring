@@ -1,5 +1,5 @@
 [Unit]
-Description=Refresh HomeLab update metrics daily
+Description=Refresh HomeLab update metrics hourly
 
 [Timer]
 OnCalendar=hourly
