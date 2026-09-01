@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project was created to gain hands-on experience with infrastructure monitoring, Linux administration, containerisation, cloud deployment and observability tooling.
+This project was created to gain hands-on experience with infrastructure monitoring, Linux administration, containerisation, cloud deployment, Infrastructure as Code, secure remote administration and observability tooling.
 
 The project began as a locally hosted monitoring platform running on an Ubuntu virtual machine and was later extended into a cloud-hosted deployment on AWS EC2.
 
@@ -15,11 +15,21 @@ The monitoring stack is deployed using Docker Compose and consists of:
 
 Prometheus is used to collect and store metrics, Grafana provides dashboards and visualisation, Node Exporter collects host-level infrastructure metrics, and Blackbox Exporter is used to monitor service availability and network connectivity.
 
-The same Docker Compose deployment is used across both the HomeLab and AWS environments. Environment-specific Prometheus configuration files are used to define the appropriate monitoring targets for each platform.
+The same Docker Compose deployment is used across both the HomeLab and AWS environments. Environment-specific Prometheus configuration files define the appropriate monitoring targets for each platform.
 
-Grafana Alerting and SMTP email notifications were also implemented to provide proactive monitoring and automated incident notification.
+Grafana Alerting and SMTP email notifications provide proactive monitoring and automated incident notification.
 
-The primary goal of the project was to design, deploy, troubleshoot and document a complete monitoring solution while gaining practical experience with technologies commonly used within cloud, infrastructure, platform engineering and DevOps environments.
+The project has subsequently been extended with:
+
+* AWS cloud deployment
+* Infrastructure as Code using Terraform
+* Automated EC2 bootstrap using cloud-init
+* Secure remote administration using Tailscale
+* Remote Windows administration using RustDesk
+* Direct SSH administration of the HomeLab VM
+* Remote Grafana and Prometheus access
+
+The primary goal of the project is to design, deploy, troubleshoot and document a complete monitoring solution while gaining practical experience with technologies and working practices commonly used within cloud, infrastructure, platform engineering and DevOps environments.
 
 ---
 
@@ -185,6 +195,89 @@ A test container was successfully launched without `sudo`, confirming that the i
 
 The infrastructure was then successfully removed using `terraform destroy`, demonstrating that the Terraform environment can be treated as disposable and recreated when required.
 
+### Phase 4 - Secure Remote HomeLab Access
+
+The HomeLab environment was extended to support secure remote administration and monitoring without exposing management services directly to the public Internet.
+
+Tailscale was deployed across the Windows host, Ubuntu HomeLab VM and mobile administration device to create a private encrypted network between trusted systems.
+
+Remote access was implemented and validated in three stages.
+
+#### Remote Access Phase 1 - Windows Host
+
+RustDesk provides graphical remote administration of the Windows 11 host.
+
+RustDesk direct IP connectivity is used across Tailscale, allowing the host to be remotely controlled without configuring public Internet port forwarding.
+
+```text
+Remote Device
+     │
+     ▼
+Tailscale
+     │
+     ▼
+Windows 11 Host
+     │
+     ▼
+RustDesk
+```
+
+Remote connectivity was successfully tested using both Wi-Fi and mobile network connections.
+
+#### Remote Access Phase 2 - Ubuntu HomeLab VM
+
+Tailscale was installed directly on the Ubuntu HomeLab VM.
+
+OpenSSH provides direct command-line administration of the VM through its private Tailscale address.
+
+```text
+Remote Device
+     │
+     ▼
+Tailscale
+     │
+     ▼
+Ubuntu HomeLab VM
+     │
+     ▼
+SSH :22
+```
+
+Tailscale and OpenSSH are configured to start automatically with Ubuntu.
+
+Remote recovery was validated by rebooting the VM entirely through an SSH connection. Following reboot, Tailscale and SSH automatically restarted and remote connectivity was restored without local intervention.
+
+#### Remote Access Phase 3 - Monitoring Platform
+
+The private Tailscale network also provides direct remote access to the HomeLab monitoring services.
+
+```text
+Remote Device
+     │
+     ▼
+Tailscale
+     │
+     ▼
+Ubuntu HomeLab VM
+     │
+     ├── SSH        :22
+     ├── Grafana    :3000
+     └── Prometheus :9090
+```
+
+Grafana dashboards and the Prometheus management interface were successfully accessed remotely from a mobile device without requiring:
+
+* Windows desktop access
+* RustDesk
+* SSH tunnelling
+* Public Internet port forwarding
+
+No inbound port forwarding is configured on the HomeLab Internet router for SSH, Grafana, Prometheus or RustDesk.
+
+Detailed implementation, validation, security and troubleshooting information is documented in:
+
+[`docs/remote-access.md`](docs/remote-access.md)
+
 ---
 
 ## Environment-Specific Configuration
@@ -246,6 +339,8 @@ If `PROMETHEUS_CONFIG` is not defined, the HomeLab configuration is used as the 
 
 This allows the same Docker Compose file to be used in multiple environments without manually editing the Compose configuration between deployments.
 
+---
+
 ## Terraform Project Structure
 
 The AWS Infrastructure as Code configuration is stored separately from the monitoring application configuration:
@@ -260,7 +355,8 @@ Terraform/
 ├── versions.tf
 └── scripts/
     └── bootstrap.sh
-	
+```
+
 ---
 
 ## Environment Variables
@@ -317,23 +413,30 @@ docker compose up -d
 Check container status:
 
 ```bash
-docker ps
+docker compose ps
 ```
 
-Access the services:
+The expected monitoring services are:
 
 | Service | Default Port |
-|----------|--------------|
+|---|---:|
 | Grafana | 3000 |
 | Prometheus | 9090 |
 | Node Exporter | 9100 |
 | Blackbox Exporter | 9115 |
 
-In the local HomeLab environment, Grafana and Prometheus can be accessed using:
+In the local HomeLab environment, Grafana and Prometheus can be accessed locally using:
 
 ```text
 http://localhost:3000
 http://localhost:9090
+```
+
+When connected to the private Tailscale network, the HomeLab services can also be accessed remotely using the VM's Tailscale address:
+
+```text
+http://<HOMELAB_TAILSCALE_IP>:3000
+http://<HOMELAB_TAILSCALE_IP>:9090
 ```
 
 In AWS, Grafana and Prometheus are accessed using the current EC2 public IP where permitted by the configured Security Group.
@@ -363,14 +466,20 @@ In AWS, Grafana and Prometheus are accessed using the current EC2 public IP wher
 * Automate initial EC2 configuration using User Data and cloud-init
 * Automatically install and configure Docker on newly provisioned EC2 instances
 * Implement disposable AWS development infrastructure using Terraform lifecycle management
+* Implement secure private remote access to the HomeLab
+* Provide direct remote SSH administration of the Ubuntu VM
+* Provide remote Grafana and Prometheus access
+* Provide remote graphical administration of the Windows host
+* Avoid exposing HomeLab management services through public Internet port forwarding
+* Validate recovery of remote-management services following a VM reboot
 
 ---
 
 ## Environment
 
-### Phase 1 Environment
+### HomeLab Environment
 
-#### Host Environment
+#### Host
 
 * Windows 11
 * Oracle VirtualBox
@@ -378,10 +487,21 @@ In AWS, Grafana and Prometheus are accessed using the current EC2 public IP wher
 #### Virtual Machine
 
 * Ubuntu Desktop
+* OpenSSH
+* Tailscale
 
-### Phase 2 Environment
+#### Remote Access
 
-#### Cloud Environment
+* Tailscale
+* RustDesk
+* OpenSSH
+* Mobile remote administration
+* Tailscale device approval
+* MFA-protected identity authentication
+
+### AWS Environment
+
+#### Cloud Infrastructure
 
 * AWS EC2
 * Amazon EBS
@@ -404,13 +524,13 @@ In AWS, Grafana and Prometheus are accessed using the current EC2 public IP wher
 * Grafana Alerting
 * SMTP Email Notifications
 
-### HomeLab Network Equipment
+### HomeLab Network
 
-* Zyxel NR5103E 5G Router
+* Virgin Fibre Broadband
+* Local router/gateway
+* Tailscale private remote-access network
 
-### Phase 3 Environment
-
-#### Infrastructure as Code
+### Infrastructure as Code
 
 * Terraform
 * HashiCorp AWS Provider
@@ -421,7 +541,7 @@ In AWS, Grafana and Prometheus are accessed using the current EC2 public IP wher
 * cloud-init
 * Bash bootstrap scripting
 
-#### Terraform-Managed AWS Resources
+### Terraform-Managed AWS Resources
 
 * Amazon VPC
 * Public subnet
@@ -438,20 +558,35 @@ In AWS, Grafana and Prometheus are accessed using the current EC2 public IP wher
 ### HomeLab
 
 ```text
-Windows Host
-    │
-Ubuntu VM
-    │
-Docker Compose
-├── Prometheus
-├── Grafana
-├── Node Exporter
-└── Blackbox Exporter
-    │
-Local Network / Router
-    │
-Internet
+                      Remote Administration Device
+                                  │
+                              Tailscale
+                                  │
+                 ┌────────────────┴────────────────┐
+                 │                                 │
+                 ▼                                 ▼
+          Windows 11 Host                  Ubuntu HomeLab VM
+                 │                                 │
+              RustDesk                    ┌────────┼─────────┐
+                                          │        │         │
+                                         SSH    Grafana  Prometheus
+                                         :22     :3000     :9090
+                                                    │
+                                               Docker Compose
+                                         ┌──────────┼──────────┐
+                                         │          │          │
+                                    Prometheus   Grafana    Exporters
+                                         │
+                                    Local Network
+                                         │
+                                  Internet Gateway
+                                         │
+                                      Internet
 ```
+
+Remote management traffic is carried across the private Tailscale network.
+
+No SSH, Grafana, Prometheus or RustDesk ports are forwarded from the Internet router.
 
 ### AWS
 
@@ -490,15 +625,13 @@ Terraform
     ├── VPC
     │    │
     │    ├── Public Subnet
-    │    │
     │    ├── Internet Gateway
-    │    │
     │    └── Route Table
-    │    │
-    └── Security Group
-    │         ├── SSH :22
-    │         ├── Grafana :3000
-    │         └── Prometheus :9090
+    │
+    ├── Security Group
+    │    ├── SSH :22
+    │    ├── Grafana :3000
+    │    └── Prometheus :9090
     │
     └── EC2 Ubuntu Server
              │
@@ -511,7 +644,8 @@ Terraform
                               ├── OS updates
                               ├── Docker Engine
                               └── Docker Compose
-							  
+```
+
 ---
 
 ## Dashboards
@@ -533,14 +667,22 @@ Metrics include:
 
 The Network Health Dashboard uses Blackbox Exporter to monitor network availability and latency within the HomeLab environment.
 
-Metrics include:
+The dashboard currently provides:
 
-* Router availability
-* Internet availability
-* Router response time
-* Internet response time
-* Historical latency trends
-* Service reachability
+* Internet status
+* Router status
+* Internet latency
+* Router latency
+* Internet availability history
+* Router availability history
+
+The router and Internet targets are provided by the HomeLab-specific Prometheus configuration.
+
+### Node Exporter Full Dashboard
+
+The Node Exporter Full dashboard provides detailed host-level visibility using metrics collected from Node Exporter.
+
+It provides more extensive Linux system information including CPU, memory, filesystem, networking, system load and other host metrics.
 
 ### EC2 Monitoring Dashboard
 
@@ -592,7 +734,7 @@ Metrics include:
 
 ## Alerting
 
-Grafana Alerting was configured to provide automated email notifications when predefined monitoring thresholds are exceeded.
+Grafana Alerting provides automated email notifications when predefined monitoring thresholds are exceeded.
 
 Alert notifications are delivered via SMTP using a dedicated project email account.
 
@@ -607,7 +749,19 @@ Configured HomeLab alert rules include:
 
 Alerts are evaluated periodically and generate email notifications when alert conditions remain active beyond the configured pending period.
 
-This provides proactive monitoring rather than relying solely on dashboard visualisation.
+Resolved notifications are also generated when the monitored service returns to a healthy state.
+
+During a HomeLab network change, the alerting system detected loss of connectivity to the previously configured router and generated a real incident notification. Following correction of the Prometheus target, Grafana subsequently generated a resolved notification.
+
+A remaining Grafana alert query was also identified as referencing the previous router address. This produced `DatasourceNoData` notifications despite the Network Health dashboard operating correctly.
+
+Correcting the independent alert-rule query restored:
+
+```text
+Health = OK
+```
+
+This demonstrated the distinction between Prometheus target configuration, Grafana dashboard queries and Grafana alert-rule queries.
 
 ---
 
@@ -616,14 +770,14 @@ This provides proactive monitoring rather than relying solely on dashboard visua
 ### HomeLab Infrastructure
 
 | Target | Purpose |
-|--------|---------|
+|---|---|
 | Ubuntu VM | Host performance and resource utilisation |
 | Docker Containers | Monitoring services running within the VM |
 
 ### HomeLab Network
 
 | Target | Purpose |
-|--------|---------|
+|---|---|
 | Local Router | Availability and latency monitoring |
 | Cloudflare DNS (1.1.1.1) | Internet connectivity monitoring |
 | Google DNS (8.8.8.8) | Internet connectivity monitoring |
@@ -631,7 +785,7 @@ This provides proactive monitoring rather than relying solely on dashboard visua
 ### AWS Deployment
 
 | Target | Purpose |
-|--------|---------|
+|---|---|
 | EC2 Instance | Infrastructure monitoring |
 | Grafana Service | Service availability monitoring |
 | Prometheus Service | Monitoring platform availability |
@@ -665,344 +819,264 @@ The AWS EC2 instance also uses persistent EBS storage for the server filesystem.
 
 Persistent storage became an important part of the project after an earlier container recreation resulted in the loss of Grafana dashboards before a dedicated Docker volume had been configured.
 
+The persistence configuration was subsequently validated when the HomeLab monitoring stack was restarted after an extended period offline and the existing Grafana dashboards, users and configuration remained available.
+
 ---
 
 ## Security
 
-Several security controls are used within the project:
+Several security controls are used within the project.
 
-* SSH key-based authentication
-* AWS IAM and MFA-backed administrative authentication
-* AWS Security Groups
-* Restricted inbound access
-* Environment variables for application credentials
+### HomeLab
+
+* Tailscale used for private remote connectivity
+* WireGuard-based encrypted transport provided by Tailscale
+* Tailscale device approval enabled
+* MFA-protected identity authentication
+* No inbound Internet port forwarding for SSH
+* No inbound Internet port forwarding for Grafana
+* No inbound Internet port forwarding for Prometheus
+* No inbound Internet port forwarding for RustDesk
+* Grafana authentication remains enabled
+* RustDesk direct IP connectivity carried across Tailscale
+* SSH available through the private Tailscale network
+* Tailscale and SSH automatically recover following an Ubuntu VM reboot
+
+### Application and Repository Security
+
+* Environment variables used for application credentials
 * `.env` excluded from Git source control
 * Google App Password used for Grafana SMTP authentication
 * No application secrets stored directly in `docker-compose.yml`
+* Credentials and secrets excluded from the repository
+
+### AWS
+
+* SSH key-based authentication
+* AWS IAM
+* MFA-backed administrative authentication
+* AWS Security Groups
+* Restricted inbound access
 * MFA-backed temporary AWS authentication used for local Terraform administration
 * No AWS credentials stored within Terraform configuration
-* SSH and monitoring access controlled using separate configurable CIDR variables
-* Unused HTTP and HTTPS Security Group rules removed following least-privilege review
-* EC2 root EBS volumes encrypted at rest
-* Terraform state excluded from Git source control
-* Deployment-specific `terraform.tfvars` excluded from Git source control
-* Terraform saved plan files excluded from Git source control
-
-AWS Security Group rules restrict administrative and monitoring access rather than exposing management services unnecessarily to the public internet.
+* SSH and monitoring access controlled using configurable CIDR variables
+* Infrastructure security rules managed through Terraform
 
 ---
 
-## Key Skills Demonstrated
+## Remote Administration
 
-This project provided practical experience with:
+The HomeLab supports two independent remote administration methods.
 
-* Linux administration
-* Docker container management
-* Docker Compose deployment
-* Prometheus configuration
-* Grafana dashboard creation
-* Metrics collection and analysis
-* Network monitoring concepts
-* Git version control
-* GitHub repository management
-* SSH authentication and key management
-* Troubleshooting containerised applications
-* Grafana alerting configuration
-* Email notification integration
-* Docker persistent storage management
-* Infrastructure monitoring and alerting
-* AWS EC2 deployment
-* Amazon EBS storage
-* IAM administration
-* Security Group configuration
-* Cloud infrastructure monitoring
-* Cloud-hosted observability platforms
-* Service availability monitoring
-* EC2 troubleshooting
-* Docker deployment in AWS
-* Environment-specific configuration
-* Secret management using environment variables
-* Infrastructure as Code (IaC)
+### Graphical Administration
+
+```text
+Remote Device
+     │
+     ▼
+Tailscale
+     │
+     ▼
+Windows 11
+     │
+     ▼
+RustDesk
+```
+
+This provides access to the complete Windows desktop and VirtualBox host environment.
+
+### Direct HomeLab Administration
+
+```text
+Remote Device
+     │
+     ▼
+Tailscale
+     │
+     ▼
+Ubuntu HomeLab VM
+     │
+     ├── SSH :22
+     ├── Grafana :3000
+     └── Prometheus :9090
+```
+
+Direct access avoids the need to establish a Windows graphical session for routine HomeLab administration and monitoring.
+
+The complete implementation is documented in:
+
+[`docs/remote-access.md`](docs/remote-access.md)
+
+---
+
+## Operational Validation
+
+The HomeLab environment has been tested through several operational scenarios.
+
+### Remote VM Reboot
+
+The Ubuntu VM was remotely rebooted through SSH.
+
+Following reboot:
+
+* Ubuntu networking recovered
+* Tailscale started automatically
+* The VM rejoined the private Tailscale network
+* OpenSSH started automatically
+* Remote SSH access was successfully restored
+
+### Monitoring Recovery
+
+Following startup of the Docker Compose monitoring stack:
+
+* Grafana started successfully
+* Prometheus started successfully
+* Node Exporter started successfully
+* Blackbox Exporter started successfully
+* Persistent Grafana dashboards remained available
+* Prometheus monitoring targets reported healthy
+
+### Network Monitoring Change
+
+Following migration to a different HomeLab Internet connection, the local gateway changed from the address used by the original monitoring configuration.
+
+The HomeLab Prometheus target was updated and Prometheus successfully resumed router monitoring.
+
+Grafana subsequently displayed the correct gateway data and the associated alert rule was updated to reference the current target.
+
+### Alert Notification
+
+Grafana SMTP alerting successfully generated:
+
+* Router unreachable notification
+* Service recovery/resolved notification
+
+This provided a real operational validation of the monitoring and alerting pipeline.
+
+---
+
+## Current Status
+
+### HomeLab
+
+* Docker monitoring stack operational
+* Prometheus operational
+* Grafana operational
+* Node Exporter operational
+* Blackbox Exporter operational
+* Network Health dashboard operational
+* Node Exporter dashboard operational
+* Grafana SMTP alerting operational
+* Persistent Grafana storage operational
+* Tailscale remote connectivity operational
+* Direct SSH administration operational
+* RustDesk Windows administration operational
+* Direct remote Grafana access operational
+* Direct remote Prometheus access operational
+
+### AWS
+
+* Manual AWS monitoring deployment completed
+* AWS monitoring dashboards developed and tested
+* Terraform infrastructure provisioning completed
+* Terraform apply/destroy lifecycle validated
+* EC2 bootstrap automation implemented and tested
+
+### Remote Access
+
+| Phase | Capability | Status |
+|---|---|---|
+| Phase 1 | Windows graphical administration using RustDesk over Tailscale | Complete |
+| Phase 2 | Direct Ubuntu administration using SSH over Tailscale | Complete |
+| Phase 3 | Direct Grafana and Prometheus access over Tailscale | Complete |
+
+---
+
+## Future Enhancements
+
+Potential future improvements include:
+
+* Configure automatic startup/restart policies for the Docker monitoring stack
+* Validate full monitoring-platform recovery following a HomeLab VM reboot
+* Further restrict management-service exposure to the Tailscale interface where appropriate
+* Implement SSH key-based authentication for mobile HomeLab administration
+* Introduce remote Terraform state
+* Add Terraform state locking
+* Continue improving reusable Terraform configuration
+* Expand AWS deployment automation
+* Introduce CI/CD validation for Terraform and monitoring configuration
+* Expand alerting and service-health monitoring
+* Add additional monitoring targets
+* Continue developing the HomeLab as a platform for infrastructure, cloud and automation experimentation
+
+---
+
+## Technologies Used
+
+### Monitoring and Observability
+
+* Prometheus
+* Grafana
+* Node Exporter
+* Blackbox Exporter
+* Grafana Alerting
+* SMTP
+
+### Containers
+
+* Docker
+* Docker Compose
+
+### Operating Systems
+
+* Ubuntu Desktop
+* Ubuntu Server
+* Windows 11
+
+### Cloud
+
+* AWS EC2
+* Amazon EBS
+* AWS IAM
+* AWS Security Groups
+* AWS VPC
+
+### Infrastructure as Code
+
 * Terraform
-* HCL configuration
-* Terraform provider configuration
-* Terraform variables and outputs
-* Terraform dependency management
-* Terraform state management
-* Terraform plan and apply workflows
-* Terraform resource lifecycle management
-* Automated AWS infrastructure provisioning
-* Amazon VPC networking
-* Internet Gateway and route table configuration
-* EC2 User Data
+* HashiCorp AWS Provider
+* HCL
 * cloud-init
-* Bash bootstrap scripting
-* Automated Docker installation
-* EBS encryption
-* Infrastructure teardown using Terraform
-* Infrastructure cost and lifecycle management
+* EC2 User Data
+* Bash
+
+### Remote Access and Administration
+
+* Tailscale
+* OpenSSH
+* RustDesk
+
+### Development and Source Control
+
+* Git
+* GitHub
 
 ---
 
-## Challenges Encountered
-
-During the build and migration process several issues were encountered and resolved, including:
-
-* Docker repository configuration issues
-* Docker daemon and socket troubleshooting
-* Container networking conflicts
-* Docker permission management
-* Prometheus target configuration
-* Grafana datasource connectivity issues
-* GitHub SSH authentication setup
-* Grafana persistent storage configuration
-* Recovery from container recreation without persistent volumes
-* SMTP integration and email alert configuration
-* EC2 SSH connectivity troubleshooting
-* Security Group configuration and validation
-* GitHub authentication from AWS EC2
-* Dynamic public IP management
-* Docker deployment in cloud environments
-* Prometheus target migration from HomeLab to AWS
-* Grafana dashboard recreation following migration
-* Node Exporter host filesystem configuration
-* Separating HomeLab and AWS monitoring targets
-* Restoring SSH access following replacement of the original SSH key
-* Recovering and validating the AWS monitoring environment after an extended shutdown
-* Updating the EC2 operating system and AWS kernel
-* Preserving Grafana dashboards using persistent Docker storage
-* Designing a reusable Terraform project structure
-* Separating deployment-specific Terraform values from reusable infrastructure code
-* Understanding Terraform state and resource relationships
-* Managing Terraform resource dependencies using resource references
-* Configuring least-privilege Security Group rules through Terraform
-* Managing EC2 replacement following User Data changes
-* Identifying and removing an orphaned EBS volume following EC2 replacement
-* Automating Docker installation through EC2 User Data and cloud-init
-* Validating automated bootstrap behaviour on a clean EC2 deployment
-* Testing complete Terraform create and destroy lifecycles
-
-Resolving these issues provided practical experience with troubleshooting Linux, container-based and cloud-hosted environments.
-
----
-
-## Screenshots
-
-### Infrastructure Dashboard
-
-<img width="1834" height="852" alt="Infrastructure Dash" src="https://github.com/user-attachments/assets/e98c0848-613c-4e0d-9460-7aa1b4b838d5" />
-
-### Network Health Dashboard
-
-<img width="1920" height="955" alt="Network Dash" src="https://github.com/user-attachments/assets/28ca5893-4a17-41c0-abed-c07fe6a9469b" />
-
-### EC2 Monitoring Dashboard
-
-<img width="1590" height="546" alt="EC2 Dash" src="https://github.com/K-Roper-Projects/homelab-monitoring/blob/main/Screenshots/AWS-Stack/EC2%20Overview%20Dashboard.png" />
-
-### AWS Website Monitoring Dashboard
-
-<img width="1650" height="545" alt="AWS Web Dash" src="https://github.com/K-Roper-Projects/homelab-monitoring/blob/main/Screenshots/AWS-Stack/AWS%20Website%20Dashboard.png" />
-
-### Docker Container Monitoring Dashboard
-
-<img width="1602" height="679" alt="Docker Dash" src="https://github.com/K-Roper-Projects/homelab-monitoring/blob/main/Screenshots/AWS-Stack/Docker%20Container%20Monitoring%20Dashboard.png" />
-
----
-
-## Lessons Learned
-
-This project highlighted the importance of persistent storage when deploying stateful applications within containers.
-
-During development, Grafana dashboards were lost following container recreation due to the absence of a persistent Docker volume. The issue was diagnosed and resolved by configuring a dedicated Docker volume mapped to `/var/lib/grafana`.
-
-The migration from a local HomeLab environment to AWS also highlighted the importance of separating environment-specific configuration from the application deployment itself.
-
-The HomeLab environment requires monitoring targets such as the local router and external DNS services, whereas the AWS environment monitors cloud-hosted services and external HTTP endpoints.
-
-Separating these into dedicated Prometheus configuration files allows the same Docker Compose stack to be reused without manually modifying monitoring targets for each environment.
-
-Additional experience was gained configuring SMTP integration, automated alert notifications, SSH access, AWS Security Groups, persistent storage and cloud-hosted Docker services.
-
-These challenges provided practical experience with troubleshooting, data persistence, configuration management and operational monitoring concepts.
-
-The introduction of Terraform demonstrated the difference between defining infrastructure and manually creating cloud resources. Terraform resource references were used to establish dependencies between the VPC, subnet, Internet Gateway, route table, Security Group and EC2 instance without manually copying AWS resource identifiers between configurations.
-
-Terraform state became an important part of the deployment lifecycle by maintaining the relationship between resources defined in HCL and the corresponding resources created within AWS.
-
-The project also demonstrated the importance of reviewing resource lifecycle behaviour. During an EC2 replacement test, the original EBS root volume remained after instance termination because it had initially been created with `delete_on_termination` disabled. The orphaned volume was identified and removed, and the disposable Terraform deployment was subsequently configured to delete its root volume on termination.
-
-EC2 User Data and cloud-init were then used to move configuration away from manual server administration. A clean Ubuntu EC2 instance was successfully provisioned and automatically configured with Docker Engine and Docker Compose without manually installing packages over SSH.
-
-This established a clear separation between infrastructure provisioning and application deployment and provides the foundation for fully automated deployment of the monitoring stack in the next phase.
-
----
-
-## Future Improvements
-
-Planned enhancements include:
-
-* Automated deployment of the monitoring stack
-* Improved secrets management
-* Automated Grafana dashboard provisioning
-* cAdvisor container monitoring
-* Monitoring additional Linux hosts
-* AWS CloudWatch integration
-* CI/CD deployment pipelines
-* Further Grafana alerting and reporting
-* Infrastructure recovery and repeatable deployment testing
-* Remote Terraform state using an appropriate backend
-* Terraform state locking and recovery strategy
-* Dedicated IAM roles for workloads and automated deployments
-* GitHub Actions authentication to AWS using OIDC
-* Terraform modules for reusable infrastructure components
-* Multiple Terraform deployment environments
-* Automated monitoring stack deployment following infrastructure provisioning
-* AWS Secrets Manager integration for application credentials
-* Reverse proxy and HTTPS access for monitoring interfaces
-* Review of multi-AZ and scaling options as the platform evolves
-
----
-
-## Repository Structure
-
-```text
-homelab-monitoring/
-├── Terraform/
-│   ├── main.tf
-│   ├── outputs.tf
-│   ├── providers.tf
-│   ├── terraform.tfvars.example
-│   ├── variables.tf
-│   ├── versions.tf
-│   ├── .terraform.lock.hcl
-│   └── scripts/
-│       └── bootstrap.sh
-├── docker-compose.yml
-├── prometheus/
-│   ├── homelab.yml
-│   └── aws.yml
-├── Screenshots/
-├── README.md
-├── .gitignore
-└── .env                 # Local only - excluded from Git
-```
-
-The repository contains the common Docker Compose deployment, environment-specific Prometheus configurations and Terraform Infrastructure as Code used to provision the AWS environment.
-
-Secrets and deployment-specific values are maintained locally through `.env` and are not committed to source control.
-
----
-
-## Current Development Phase
-
-The project has now completed **Terraform Milestone 3 - AWS Infrastructure Provisioning and EC2 Bootstrap** and is ready to begin Milestone 4.
-
-The aim of the Terraform phase is to move from infrastructure that was originally created manually through the AWS Management Console toward a repeatable, version-controlled and increasingly automated deployment.
-
-The existing working AWS deployment remains the reference architecture while the Terraform configuration is developed and tested.
-
-### Terraform Milestone 1 - Project Initialisation
-
-The initial Terraform development environment was established.
-
-Completed work includes:
-
-* Terraform installed and configured on the local development machine
-* AWS CLI installed
-* Short-lived AWS authentication configured using browser-based AWS login
-* Existing IAM user and MFA authentication retained
-* Initial Terraform project structure created
-* Terraform version requirements defined
-* HashiCorp AWS provider configured
-* AWS region configured for `us-east-1`
-* AWS provider dependency constrained to the 6.x release family
-* Provider dependency lock file generated
-* Local Terraform working files excluded from Git source control
-* Terraform state files excluded from Git source control
-* Terraform formatting established using `terraform fmt`
-* Terraform configuration successfully validated using `terraform validate`
-
-Initial Terraform project structure:
-
-```text
-Terraform/
-├── main.tf
-├── outputs.tf
-├── providers.tf
-├── variables.tf
-├── versions.tf
-└── .terraform.lock.hcl
-```
-
-### Terraform Milestone 2 - Reusable Configuration Inputs
-
-Terraform inputs were introduced to separate reusable infrastructure configuration from deployment-specific values.
-
-Completed work includes:
-
-* AWS region and Availability Zone variables
-* EC2 instance type and AMI variables
-* SSH key pair configuration
-* Separate trusted CIDR ranges for SSH and monitoring access
-* VPC and subnet CIDR configuration
-* EBS size, type, encryption and lifecycle configuration
-* Deployment-specific values stored in `terraform.tfvars`
-* `terraform.tfvars` excluded from Git source control
-* Reusable `terraform.tfvars.example` committed to the repository
-
-### Terraform Milestone 3 - AWS Infrastructure Provisioning
-
-Terraform was used to provision and validate a complete disposable AWS infrastructure environment.
-
-Completed work includes:
-
-* Dedicated VPC
-* Public subnet
-* Internet Gateway
-* Route table and subnet association
-* Security Group with least-privilege ingress rules
-* EC2 instance provisioning
-* Encrypted gp3 EBS root storage
-* Terraform outputs
-* Terraform state validation
-* EC2 User Data integration
-* Automated Ubuntu bootstrap using cloud-init
-* Automated Docker Engine installation
-* Automated Docker Compose installation
-* Docker service enablement
-* Docker group configuration
-* Successful Docker container execution without sudo
-* Successful infrastructure teardown using `terraform destroy`
-
-Milestone 3 demonstrated the complete Terraform lifecycle from configuration and planning through deployment, automated host bootstrap, validation and destruction.
-
-### Terraform Milestone 4 - Automated Monitoring Stack Deployment
-
-The next phase will extend the automated bootstrap process beyond creation of a Docker-ready EC2 host.
-
-Planned work will investigate and implement a suitable method for automatically delivering the monitoring application configuration to the EC2 instance and starting the Docker Compose monitoring stack.
-
-This will move the deployment toward:
-
-```text
-terraform apply
-    ↓
-AWS infrastructure
-    ↓
-EC2 bootstrap
-    ↓
-Docker installation
-    ↓
-Monitoring configuration deployment
-    ↓
-Docker Compose
-    ↓
-Operational Grafana and Prometheus platform
-```
-
----
-
-## Author
-
-This project was developed as part of a personal learning programme focused on infrastructure, cloud technologies and observability tooling.
+## Repository
+
+This repository contains the configuration and Infrastructure as Code used to build and operate the HomeLab and AWS monitoring environments.
+
+The project is maintained as a practical learning environment and portfolio demonstration covering:
+
+* Infrastructure monitoring
+* Observability
+* Linux administration
+* Docker
+* Networking
+* AWS
+* Infrastructure as Code
+* Automation
+* Secure remote administration
+* Troubleshooting
+* Operational validation
