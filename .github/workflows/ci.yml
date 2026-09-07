@@ -29,3 +29,18 @@ jobs:
       - name: Run ShellCheck
         run: shellcheck check-updates.sh
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Check Terraform formatting
+        working-directory: Terraform
+        run: terraform fmt -check
+
+      - name: Initialise Terrraform
+        working-directory: Terraform
+        run: terraform init -backend=false
+
+      - name: Validate Terraform configuration
+        working-directory: Terraform
+        run: terraform validate
+
