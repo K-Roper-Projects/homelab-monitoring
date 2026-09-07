@@ -26,3 +26,6 @@ jobs:
             prom/prometheus \
             check config /etc/prometheus/homelab.yml
 
+      - name: Run ShellCheck
+        run: shellcheck check-updates.sh
+
