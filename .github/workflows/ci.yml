@@ -1,0 +1,46 @@
+name: HomeLab CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  basic-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Validate Docker Compose configuration
+        env:
+          SMTP_USER: ci-placeholder
+          SMTP_PASSWORD: ci-placeholder
+        run: docker compose config --quiet
+
+      - name: Validate Prometheus HomeLab configuration
+        run: |
+          docker run --rm \
+            --entrypoint /bin/promtool \
+            -v "$PWD/prometheus:/etc/prometheus" \
+            prom/prometheus \
+            check config /etc/prometheus/homelab.yml
+
+      - name: Run ShellCheck
+        run: shellcheck check-updates.sh
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+
+      - name: Check Terraform formatting
+        working-directory: Terraform
+        run: terraform fmt -check
+
+      - name: Initialise Terrraform
+        working-directory: Terraform
+        run: terraform init -backend=false
+
+      - name: Validate Terraform configuration
+        working-directory: Terraform
+        run: terraform validate
+
