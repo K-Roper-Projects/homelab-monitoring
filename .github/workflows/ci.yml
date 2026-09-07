@@ -12,5 +12,5 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Confirm repository contents
-        run: ls -la
+      - name: Validate Docker Compose configuration
+        run: docker compose config --quiet
