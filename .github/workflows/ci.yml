@@ -17,3 +17,12 @@ jobs:
           SMTP_USER: ci-placeholder
           SMTP_PASSWORD: ci-placeholder
         run: docker compose config --quiet
+
+      - name: Validate Prometheus HomeLab configuration
+        run: |
+          docker run --rm \
+            --entrypoint /bin/promtool \
+            -v "$PWD/prometheus:/etc/prometheus" \
+            prom/prometheus \
+            check config /etc/prometheus/homelab.yml
+
