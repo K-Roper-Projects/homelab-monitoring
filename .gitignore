@@ -19,5 +19,6 @@ terraform.tfvars
 *.tfplan
 tfplan
 
-
+# Draw.io backup files
+*.bkp
 node-exporter-textfile/
