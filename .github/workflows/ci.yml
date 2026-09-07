@@ -1,0 +1,16 @@
+name: HomeLab CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  basic-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Confirm repository contents
+        run: ls -la
