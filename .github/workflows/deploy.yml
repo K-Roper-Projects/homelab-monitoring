@@ -17,3 +17,16 @@ jobs:
 
       - name: Test HomeLab connectivity
         run: tailscale ping --c 3 ${{ vars.HOMELAB_HOST }}
+
+      - name: Configure SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HOMELAB_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+      - name: Test SSH connectivity
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+            -i ~/.ssh/id_ed25519 \
+            kevin@${{ vars.HOMELAB_HOST }} \
+            'hostname && whoami && pwd'
