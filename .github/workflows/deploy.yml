@@ -48,3 +48,9 @@ jobs:
             kevin@${{ vars.HOMELAB_HOST }} \
             'cd ~/HomeLab/Monitoring && docker compose config --quiet'
 
+      - name: Deploy HomeLab containers
+        run: |
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            kevin@${{ vars.HOMELAB_HOST }} \
+            'cd ~/HomeLab/Monitoring && docker compose up -d'
