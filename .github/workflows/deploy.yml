@@ -39,7 +39,7 @@ jobs:
           ssh \
             -i ~/.ssh/id_ed25519 \
             kevin@${{ vars.HOMELAB_HOST }} \
-            'cd ~/HomeLab/Monitoring && git fetch origin && git pull --ff-only origin main'
+            'cd ~/HomeLab/Monitoring && git fetch deploy-read main && git merge --ff-only FETCH_HEAD'
 
       - name: Validate live Docker Compose configuration
         run: |
