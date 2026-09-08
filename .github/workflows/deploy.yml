@@ -24,7 +24,7 @@ jobs:
           echo "${{ secrets.HOMELAB_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
-          echo "${{ vars.HOMELAB_HOST }} ${{ vars.HOMELAB_SSH_HOST_KEY }}" > ~/.ssh/known_hosts
+          echo "${{ vars.HOMELAB_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
       - name: Test SSH connectivity
