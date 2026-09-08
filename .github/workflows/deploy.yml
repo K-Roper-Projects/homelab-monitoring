@@ -26,6 +26,18 @@ jobs:
 
           echo "${{ vars.HOMELAB_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+      - name: Diagnose SSH host key
+        run: |
+          echo "Stored known_hosts entry:"
+          ssh-keygen -F "${{ vars.HOMELAB_HOST }}" -f ~/.ssh/known_hosts || true
+
+          echo
+          echo "Stored fingerprint:"
+          ssh-keygen -lf ~/.ssh/known_hosts || true
+
+          echo
+          echo "Live fingerprint presented by HomeLab:"
+          ssh-keyscan -t ed25519 "${{ vars.HOMELAB_HOST }}" 2>/dev/null | ssh-keygen -lf -
 
       - name: Test SSH connectivity
         run: |
