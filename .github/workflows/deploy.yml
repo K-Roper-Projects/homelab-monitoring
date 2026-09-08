@@ -47,3 +47,10 @@ jobs:
             -i ~/.ssh/id_ed25519 \
             kevin@${{ vars.HOMELAB_HOST }} \
             'cd ~/HomeLab/Monitoring && docker compose config --quiet'
+
+      - name: Validate live Docker Compose configuration
+        run: |
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            kevin@${{ vars.HOMELAB_HOST }} \
+            'cd ~/HomeLab/Monitoring && docker compose config --quiet'
