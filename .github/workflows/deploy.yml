@@ -33,3 +33,10 @@ jobs:
             -i ~/.ssh/id_ed25519 \
             kevin@${{ vars.HOMELAB_HOST }} \
             'hostname && whoami && pwd'
+
+      - name: Update HomeLab repository
+        run: |
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            kevin@${{ vars.HOMELAB_HOST }} \
+            'cd ~/HomeLab/Monitoring && git fetch origin && git pull --ff-only origin main'
