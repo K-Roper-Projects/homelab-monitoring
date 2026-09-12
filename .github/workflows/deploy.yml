@@ -33,3 +33,69 @@ jobs:
             -i ~/.ssh/id_ed25519 \
             kevin@${{ vars.HOMELAB_HOST }} \
             'hostname && whoami && pwd'
+
+      - name: Update HomeLab repository
+        run: |
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            kevin@${{ vars.HOMELAB_HOST }} \
+            'cd ~/HomeLab/Monitoring && git fetch deploy-read main && git merge --ff-only FETCH_HEAD'
+
+      - name: Validate live Docker Compose configuration
+        run: |
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            kevin@${{ vars.HOMELAB_HOST }} \
+            'cd ~/HomeLab/Monitoring && docker compose config --quiet'
+
+      - name: Deploy HomeLab containers
+        run: |
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            kevin@${{ vars.HOMELAB_HOST }} \
+            'cd ~/HomeLab/Monitoring && docker compose up -d'
+
+      - name: Verify post-deployment health
+        run: |
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            kevin@${{ vars.HOMELAB_HOST }} \
+            'cd ~/HomeLab/Monitoring && \
+            echo "=== Container Status ===" && \
+            docker compose ps && \
+            echo "=== Checking Required Containers ===" && \
+            for service in prometheus grafana node-exporter blackbox-exporter; do \
+              if ! docker compose ps --status running --services | grep -qx "$service"; then \
+                echo "ERROR: $service is not running"; \
+                exit 1; \
+              fi; \
+              echo "OK: $service is running"; \
+            done && \
+            echo "=== Checking Prometheus Readiness ===" && \
+            for attempt in 1 2 3 4 5; do \
+              if curl --fail --silent http://localhost:9090/-/ready; then \
+                echo; \
+                echo "OK: Prometheus is ready"; \
+                break; \
+              fi; \
+              if [ "$attempt" -eq 5 ]; then \
+                echo "ERROR: Prometheus readiness check failed"; \
+                exit 1; \
+              fi; \
+              echo "Prometheus not ready yet - retrying..."; \
+              sleep 3; \
+            done && \
+            echo "=== Checking Grafana Health ===" && \
+            for attempt in 1 2 3 4 5; do \
+              if curl --fail --silent http://localhost:3000/api/health; then \
+                echo; \
+                echo "OK: Grafana is healthy"; \
+                break; \
+              fi; \
+              if [ "$attempt" -eq 5 ]; then \
+                echo "ERROR: Grafana health check failed"; \
+                exit 1; \
+              fi; \
+              echo "Grafana not ready yet - retrying..."; \
+              sleep 3; \
+            done'
