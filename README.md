@@ -4,11 +4,11 @@
 
 A multi-environment infrastructure monitoring and automation platform built across a local Linux HomeLab and AWS.
 
-The project combines containerised monitoring, Infrastructure as Code, automated cloud provisioning, secure remote administration, operating-system maintenance monitoring, alerting and CI/CD automation to provide visibility into infrastructure and service health.
+The project combines containerised monitoring, Infrastructure as Code, automated cloud provisioning, secure remote administration, operating-system maintenance monitoring, container observability, alerting and CI/CD automation to provide visibility into infrastructure and service health.
 
 Originally developed as a locally hosted monitoring stack on an Ubuntu virtual machine, the platform has evolved into an AWS-deployable environment using Terraform and `cloud-init`, while retaining a common Docker-based monitoring architecture across both environments.
 
-Development and deployment processes are now supported by GitHub Actions, providing automated configuration validation and controlled deployment to the private HomeLab environment.
+Development and deployment processes are supported by GitHub Actions, providing automated configuration validation and controlled deployment to the private HomeLab environment.
 
 ### Current Capabilities
 
@@ -58,9 +58,16 @@ The local HomeLab provides a persistent infrastructure environment for developme
                                         │
                                   Docker Compose
                                         │
-                     ┌──────────────────┼──────────────────┐
-                     │                  │                  │
-                 Prometheus          Grafana          Exporters
+             ┌──────────────────────────┼──────────────────────────┐
+             │                          │                          │
+         Prometheus                  Grafana                   Exporters
+             │                                                     │
+             │                                      ┌──────────────┼──────────────┐
+             │                                      │              │              │
+             │                                Node Exporter   Blackbox       cAdvisor
+             │                                                  Exporter
+             │
+             └──────────────── Metrics Collection ─────────────────┘
 ```
 
 ![HomeLab Monitoring Platform Architecture](docs/images/homelab-monitoring-architecture.png)
@@ -69,11 +76,11 @@ The local HomeLab provides a persistent infrastructure environment for developme
 
 ## Core Monitoring Stack
 
-The monitoring platform is deployed using Docker Compose and consists of:
+The monitoring platform is deployed using Docker Compose.
 
 ### Prometheus
 
-Collects and stores infrastructure, operating-system, network and service metrics.
+Collects and stores infrastructure, operating-system, network, service and container metrics.
 
 ### Grafana
 
@@ -96,8 +103,6 @@ The Node Exporter textfile collector is also used to expose custom HomeLab maint
 
 Provides active availability and response-time monitoring for network and HTTP endpoints.
 
-The same Docker Compose deployment is used across the HomeLab and AWS environments, with environment-specific Prometheus configuration defining the appropriate monitoring targets.
-
 ### cAdvisor
 
 Provides container-level resource and operational metrics directly from the Docker environment.
@@ -113,7 +118,7 @@ cAdvisor exposes metrics to Prometheus for each container, including:
 
 Docker Compose metadata exposed by cAdvisor allows metrics to be grouped by service, providing clean identification of the monitoring containers within Prometheus and Grafana.
 
-The HomeLab currently monitors:
+The HomeLab currently monitors five core containers:
 
 ```text
 prometheus
@@ -121,6 +126,9 @@ grafana
 node-exporter
 blackbox-exporter
 cadvisor
+```
+
+This extends the platform from host and network monitoring into container-level observability.
 
 ---
 
@@ -235,6 +243,7 @@ The HomeLab environment monitors:
 
 * Prometheus
 * Node Exporter
+* Docker containers through cAdvisor
 * local router availability
 * Cloudflare DNS
 * Google DNS
@@ -273,7 +282,7 @@ The platform has been extended beyond basic infrastructure monitoring to include
 
 ### Automatic Monitoring-Stack Recovery
 
-All monitoring containers use:
+Monitoring containers use:
 
 ```yaml
 restart: unless-stopped
@@ -446,16 +455,19 @@ The deployment workflow therefore performs health verification after:
 docker compose up -d
 ```
 
-The workflow confirms that the expected services are running:
+The workflow verifies the expected monitoring services before checking application readiness.
+
+The expected services are:
 
 ```text
 prometheus
 grafana
 node-exporter
 blackbox-exporter
+cadvisor
 ```
 
-It then verifies application readiness using:
+Application readiness is then verified using:
 
 ```text
 Prometheus : http://localhost:9090/-/ready
@@ -488,7 +500,146 @@ Grafana healthy
 Deployment successful
 ```
 
-The complete CD workflow has been successfully executed from the protected `main` branch.
+---
+
+## Container Observability & Alerting
+
+Phase 7 extended the HomeLab monitoring stack with cAdvisor to provide visibility into the Docker containers running the monitoring platform.
+
+cAdvisor is deployed as part of the existing Docker Compose stack and exposes container metrics to Prometheus on port `8080`.
+
+Prometheus collects these metrics using a dedicated scrape job:
+
+```yaml
+- job_name: 'cadvisor'
+  static_configs:
+    - targets: ['cadvisor:8080']
+```
+
+### Docker Container Monitoring Dashboard
+
+A dedicated Grafana dashboard provides operational visibility across the five core monitoring services.
+
+The dashboard includes:
+
+* individual container UP/DOWN status
+* container uptime
+* CPU utilisation
+* memory working-set usage
+* network receive throughput
+* network transmit throughput
+
+![Docker Container Monitoring Dashboard](Screenshots/container-monitoring-dashboard.png)
+
+The dashboard provides a single operational view of the Docker monitoring environment and allows abnormal container behaviour or service loss to be identified quickly.
+
+### Container Availability Monitoring
+
+Container presence is monitored using the cAdvisor metric:
+
+```text
+container_last_seen
+```
+
+Each expected Docker Compose service is evaluated independently.
+
+The Grafana status panel presents each service as:
+
+```text
+UP    → Green
+DOWN  → Red
+```
+
+Container state detection was validated through controlled service shutdown and recovery testing.
+
+Testing confirmed the lifecycle:
+
+```text
+Container Running
+      │
+      ▼
+Status UP
+      │
+      ▼
+Container Stopped
+      │
+      ▼
+cAdvisor stops reporting container
+      │
+      ▼
+Status DOWN
+      │
+      ▼
+Container Restarted
+      │
+      ▼
+Status UP
+```
+
+### Docker Container Down Alert
+
+A Grafana alert rule:
+
+```text
+Docker Container Down
+```
+
+monitors the expected services for container disappearance.
+
+The rule uses Prometheus `absent_over_time()` queries to detect when an expected container has not been reported for two minutes.
+
+The monitored services are:
+
+```text
+prometheus
+grafana
+node-exporter
+blackbox-exporter
+cadvisor
+```
+
+The alert is evaluated every minute, with the two-minute absence period handled directly by PromQL.
+
+Alert notifications are routed through the existing Grafana notification policy and email contact point.
+
+Controlled failure and recovery testing confirmed:
+
+```text
+Container Stopped
+      │
+      ▼
+Container Status DOWN
+      │
+      ▼
+Grafana Alert Firing
+      │
+      ▼
+Email Notification
+      │
+      ▼
+Container Restored
+      │
+      ▼
+Container Status UP
+      │
+      ▼
+Grafana Alert Resolved
+      │
+      ▼
+Recovery Email
+```
+
+Both firing and resolved email notifications were successfully validated.
+
+### Monitoring Dependency
+
+The dashboard provides status visibility for all five monitoring containers.
+
+Prometheus and Grafana, however, form part of the monitoring path itself. A complete failure of Prometheus prevents Grafana from querying its datasource, while a complete Grafana failure also removes the Grafana alerting engine.
+
+Reliable notification of failures affecting the monitoring platform itself therefore requires an independent external monitoring path.
+
+This is retained as a future resilience enhancement rather than masking the dependency within the existing monitoring stack.
 
 ---
 
@@ -511,8 +662,6 @@ The project follows several configuration-management and security practices:
 ---
 
 ## Project Evolution
-
-The project has progressed through several stages:
 
 ### Phase 1 — Local Monitoring
 
@@ -538,7 +687,7 @@ Added automatic container recovery, operating-system maintenance metrics and Gra
 
 Introduced GitHub Actions for automated configuration validation and controlled deployment.
 
-Continuous Integration now validates Docker Compose, Prometheus, Bash and Terraform configuration before changes can pass through the protected `main` branch.
+Continuous Integration validates Docker Compose, Prometheus, Bash and Terraform configuration before changes can pass through the protected `main` branch.
 
 Continuous Deployment uses an ephemeral Tailscale GitHub Actions runner and dedicated SSH authentication to securely deploy the monitoring stack to the HomeLab VM.
 
@@ -592,6 +741,11 @@ homelab-monitoring/
 │   ├── homelab.yml
 │   └── aws.yml
 ├── Screenshots/
+│   ├── AWS-Stack/
+│   ├── container-monitoring-dashboard.png
+│   ├── infrastructure-dashboard.png
+│   ├── monitoring-architecture-v2.png
+│   └── network-dashboard.png
 ├── check-updates.sh
 ├── docker-compose.yml
 ├── terraform.tfvars.example
@@ -609,6 +763,15 @@ This project has provided practical experience in:
 * Prometheus metrics collection and configuration
 * Grafana dashboards and alerting
 * Docker and Docker Compose
+* implementing container-level observability using cAdvisor
+* collecting and querying Docker container metrics with Prometheus
+* building Grafana dashboards for per-container CPU, memory, network, uptime and availability
+* using Docker Compose metadata to identify and group container metrics
+* designing expected-service availability monitoring
+* using PromQL `absent_over_time()` for service disappearance detection
+* validating monitoring through controlled container failure and recovery testing
+* implementing and testing Grafana firing and resolved email notifications
+* understanding self-monitoring dependencies within an observability platform
 * AWS infrastructure deployment
 * Infrastructure as Code using Terraform
 * automated Linux provisioning using `cloud-init`
@@ -623,15 +786,6 @@ This project has provided practical experience in:
 * SSH host-key verification
 * post-deployment application health verification
 * troubleshooting multi-stage authentication and deployment workflows
-* implementing container-level observability using cAdvisor
-* collecting and querying Docker container metrics with Prometheus
-* building Grafana dashboards for per-container CPU, memory, network, uptime and availability
-* using Docker Compose metadata to identify and group container metrics
-* designing explicit expected-service availability monitoring
-* using PromQL `absent_over_time()` for service disappearance detection
-* validating monitoring through controlled container failure and recovery testing
-* implementing and testing Grafana firing and resolved email notifications
-* understanding self-monitoring dependencies within an observability platform
 
 ---
 
