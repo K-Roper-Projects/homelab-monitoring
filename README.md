@@ -1,6 +1,6 @@
 # HomeLab Monitoring Platform
 
-**AWS · Terraform · Docker · Linux · Prometheus · Grafana · GitHub Actions · CI/CD · Infrastructure as Code · Automation · Observability**
+**AWS · Terraform · Docker · Linux · Prometheus · Grafana · cAdvisor · GitHub Actions · CI/CD · Infrastructure as Code · Automation · Observability**
 
 A multi-environment infrastructure monitoring and automation platform built across a local Linux HomeLab and AWS.
 
@@ -14,14 +14,18 @@ Development and deployment processes are now supported by GitHub Actions, provid
 
 * Containerised monitoring using Docker Compose
 * Infrastructure and service monitoring with Prometheus
-* Grafana dashboards and automated alerting
+* Linux host monitoring using Node Exporter
+* Network and endpoint monitoring using Blackbox Exporter
+* Container-level observability using cAdvisor
+* Grafana dashboards for host, network, service and container monitoring
+* Per-container CPU, memory, network, uptime and availability monitoring
+* Automated Grafana alerting with firing and resolved email notifications
 * AWS infrastructure provisioning using Terraform
 * Automated EC2 bootstrap using `cloud-init`
 * Environment-specific HomeLab and AWS monitoring configurations
 * Secure remote administration using Tailscale and SSH
 * Automatic monitoring-stack recovery following system reboot
 * Custom Prometheus operating-system maintenance metrics
-* Grafana alerting for infrastructure and maintenance conditions
 * Automated CI validation using GitHub Actions
 * Protected `main` branch with required CI checks
 * Manual controlled deployment to the HomeLab environment
@@ -93,6 +97,30 @@ The Node Exporter textfile collector is also used to expose custom HomeLab maint
 Provides active availability and response-time monitoring for network and HTTP endpoints.
 
 The same Docker Compose deployment is used across the HomeLab and AWS environments, with environment-specific Prometheus configuration defining the appropriate monitoring targets.
+
+### cAdvisor
+
+Provides container-level resource and operational metrics directly from the Docker environment.
+
+cAdvisor exposes metrics to Prometheus for each container, including:
+
+* CPU utilisation
+* memory working-set usage
+* network receive traffic
+* network transmit traffic
+* container start time
+* container presence and availability
+
+Docker Compose metadata exposed by cAdvisor allows metrics to be grouped by service, providing clean identification of the monitoring containers within Prometheus and Grafana.
+
+The HomeLab currently monitors:
+
+```text
+prometheus
+grafana
+node-exporter
+blackbox-exporter
+cadvisor
 
 ---
 
@@ -516,6 +544,18 @@ Continuous Deployment uses an ephemeral Tailscale GitHub Actions runner and dedi
 
 Post-deployment verification confirms container state, Prometheus readiness and Grafana health before a deployment is considered successful.
 
+### Phase 7 — Advanced Observability & Container Monitoring
+
+Extended the monitoring platform from host and network monitoring into Docker container-level observability using cAdvisor.
+
+Prometheus now collects per-container CPU, memory, network, uptime and availability metrics for the monitoring stack.
+
+A dedicated Docker Container Monitoring dashboard provides a consolidated operational view of Prometheus, Grafana, Node Exporter, Blackbox Exporter and cAdvisor.
+
+Container availability monitoring and a multi-service `Docker Container Down` alert were implemented and validated through controlled container failure and recovery testing.
+
+Grafana email notifications were successfully tested for both firing and resolved alert states.
+
 ---
 
 ## Technologies
@@ -524,7 +564,7 @@ Post-deployment verification confirms container state, Prometheus readiness and 
 |---|---|
 | Operating Systems | Ubuntu Linux |
 | Containers | Docker, Docker Compose |
-| Monitoring | Prometheus, Node Exporter, Blackbox Exporter |
+| Monitoring & Observability | Prometheus, Node Exporter, Blackbox Exporter, cAdvisor |
 | Visualisation & Alerting | Grafana |
 | Cloud | AWS EC2, VPC, EBS, Security Groups |
 | Infrastructure as Code | Terraform |
@@ -583,30 +623,70 @@ This project has provided practical experience in:
 * SSH host-key verification
 * post-deployment application health verification
 * troubleshooting multi-stage authentication and deployment workflows
+* implementing container-level observability using cAdvisor
+* collecting and querying Docker container metrics with Prometheus
+* building Grafana dashboards for per-container CPU, memory, network, uptime and availability
+* using Docker Compose metadata to identify and group container metrics
+* designing explicit expected-service availability monitoring
+* using PromQL `absent_over_time()` for service disappearance detection
+* validating monitoring through controlled container failure and recovery testing
+* implementing and testing Grafana firing and resolved email notifications
+* understanding self-monitoring dependencies within an observability platform
 
 ---
 
 ## Future Development
 
-Potential future enhancements include:
+### Phase 8 — Terraform State & Structure
 
-* automatic deployment following approved merges to `main`
-* deployment environments and approval gates
-* rollback capability following failed deployments
-* container-level metrics using cAdvisor
-* additional AWS monitoring and CloudWatch integration
-* expanded alerting and notification workflows
-* additional infrastructure nodes within the physical HomeLab
-* network segmentation and firewall monitoring
-* further Terraform modularisation
-* automated testing of monitoring rules and alert definitions
+Planned improvements to the Infrastructure as Code implementation include:
+
+* remote Terraform state
+* state locking where appropriate
+* review and modularisation of the Terraform configuration
+* improved separation and reuse of infrastructure components
+
+### Phase 9 — Physical HomeLab Expansion
+
+The HomeLab will be expanded beyond the current virtualised environment to include additional physical infrastructure.
+
+Planned development includes:
+
+* additional physical Linux nodes
+* OPNsense firewall integration
+* managed Ethernet switching
+* VLANs and network segmentation
+* multiple monitored hosts
+* firewall and network infrastructure monitoring
+* additional Prometheus targets
+
+### Phase 10 — Deployment Resilience
+
+Further CI/CD development will focus on deployment safety and recovery.
+
+Planned enhancements include:
+
+* GitHub deployment environments
+* deployment approval gates
+* rollback capability
+* additional post-deployment validation
+* automated testing of Prometheus rules and alerts
+* improved deployment failure handling and recovery
+* evaluation of automatic deployment following approved merges to `main`
+* independent monitoring of the monitoring platform itself
 
 ---
 
 ## Project Status
 
-**Phase 6 — CI/CD & Configuration Assurance: Complete**
+**Phase 7 — Advanced Observability & Container Monitoring: Complete**
 
-The platform currently provides a reproducible multi-environment monitoring architecture, Terraform-based AWS infrastructure, automated host provisioning, secure remote administration, operational monitoring and a GitHub Actions CI/CD pipeline with post-deployment health verification.
+The platform now provides monitoring across host, network, service and container layers.
 
-The HomeLab environment acts as the persistent operational platform, while AWS infrastructure can be provisioned and destroyed as required using Terraform.
+The HomeLab monitoring stack includes Prometheus, Grafana, Node Exporter, Blackbox Exporter and cAdvisor, with dedicated container-level dashboards providing CPU, memory, network, uptime and availability visibility.
+
+Container failure detection has been validated through controlled shutdown and recovery testing, with Grafana successfully delivering both firing and resolved email notifications.
+
+The project also retains its Terraform-based AWS infrastructure, automated EC2 provisioning, secure Tailscale administration and GitHub Actions CI/CD pipeline.
+
+**Next Phase: Phase 8 — Terraform State & Structure**
