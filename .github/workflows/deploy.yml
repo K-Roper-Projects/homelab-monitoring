@@ -64,7 +64,7 @@ jobs:
             echo "=== Container Status ===" && \
             docker compose ps && \
             echo "=== Checking Required Containers ===" && \
-            for service in prometheus grafana node-exporter blackbox-exporter; do \
+            for service in prometheus grafana node-exporter blackbox-exporter cadvisor; do \
               if ! docker compose ps --status running --services | grep -qx "$service"; then \
                 echo "ERROR: $service is not running"; \
                 exit 1; \
